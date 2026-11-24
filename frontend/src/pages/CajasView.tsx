@@ -377,7 +377,7 @@ export const CajasView: React.FC<CajasViewProps> = ({ cajas, onRefresh, onNaviga
       {/* Modal: Desglose de Efectivo Físico de la Caja (Sección 10.3) */}
       {selectedCaja && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200">
+          <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200 max-h-[90dvh] flex flex-col">
             <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-lg">{selectedCaja.nombre}</h3>
@@ -419,7 +419,8 @@ export const CajasView: React.FC<CajasViewProps> = ({ cajas, onRefresh, onNaviga
               ) : (
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Composición Física Actual:</h4>
-                  <table className="w-full text-xs text-left border border-slate-200 rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                    <table className="w-full text-xs text-left whitespace-nowrap">
                     <thead className="bg-slate-100 text-slate-700 font-bold">
                       <tr>
                         <th className="p-2">Denominación / Tipo</th>
@@ -448,6 +449,7 @@ export const CajasView: React.FC<CajasViewProps> = ({ cajas, onRefresh, onNaviga
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               )}
             </div>

@@ -47,7 +47,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold mb-2">
               <span>PATRIMONIO TOTAL CONSOLIDADO</span>
             </div>
-            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-white">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white">
               {formatMoney(summary.saldoTotal)} <span className="text-lg font-medium text-slate-400">MXN</span>
             </h1>
             <p className="text-slate-300 text-sm mt-1">

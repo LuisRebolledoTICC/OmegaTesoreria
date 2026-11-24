@@ -424,7 +424,7 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
       {/* Modal: Registro de Entrada / Salida / Transferencia */}
       {operacionModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-200">
+          <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-200 max-h-[90dvh] overflow-y-auto">
             <div
               className={`p-5 text-white flex items-center justify-between ${
                 operacionModal === 'entrada'
@@ -602,7 +602,7 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
       {/* Modal: Reversión de Movimiento */}
       {anulandoOpId && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-200">
+          <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-200 max-h-[90dvh] overflow-y-auto">
             <div className="bg-rose-900 text-white p-5 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-lg">Revertir Movimiento #{anulandoOpId}</h3>

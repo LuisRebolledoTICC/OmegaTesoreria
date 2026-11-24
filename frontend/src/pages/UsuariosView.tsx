@@ -330,7 +330,8 @@ export const UsuariosView: React.FC = () => {
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-            <table className="w-full text-xs text-left">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left whitespace-nowrap">
               <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider border-b border-slate-200">
                 <tr>
                   <th className="p-3">ID</th>
@@ -407,6 +408,7 @@ export const UsuariosView: React.FC = () => {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -414,7 +416,7 @@ export const UsuariosView: React.FC = () => {
       {/* SUBTAB 2: ROLES Y PERMISOS DE MÓDULOS */}
       {activeSubTab === 'roles' && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
             <div>
               <h3 className="text-sm font-bold text-slate-700">Roles Configurados y Módulos Visibles</h3>
               <p className="text-xs text-slate-500">
@@ -741,7 +743,7 @@ export const UsuariosView: React.FC = () => {
       {/* Modal: Crear / Configurar Rol */}
       {showRolModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[90dvh] overflow-y-auto">
             <h3 className="text-base font-bold text-slate-900 mb-1">
               {rolEdit ? `Configurar Permisos: ${rolEdit.nombre}` : 'Crear Nuevo Rol'}
             </h3>

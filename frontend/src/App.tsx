@@ -31,6 +31,7 @@ const MainLayout: React.FC = () => {
   const firstAvailableTab = availableTabs[0] || null;
 
   const [activeTab, setActiveTab] = useState<ActiveTab | null>(() => firstAvailableTab);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [cajas, setCajas] = useState<Caja[]>([]);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [selectedCajaIdForConteo, setSelectedCajaIdForConteo] = useState<number | null>(null);
@@ -116,8 +117,8 @@ const MainLayout: React.FC = () => {
   const currentTab = (activeTab && canAccessModule(activeTab) ? activeTab : firstAvailableTab) as ActiveTab;
 
   return (
-    <div className="flex min-h-screen bg-slate-50 font-sans">
-      {/* Sidebar fijo */}
+    <div className="flex h-dvh w-full overflow-hidden bg-slate-50 font-sans">
+      {/* Sidebar fija en desktop/tablet y drawer en móvil */}
       <Sidebar
         activeTab={currentTab}
         setActiveTab={(tab) => {
@@ -126,17 +127,20 @@ const MainLayout: React.FC = () => {
           }
         }}
         selectedCajaIdForConteo={selectedCajaIdForConteo}
+        isMobileOpen={isMobileMenuOpen}
+        setIsMobileOpen={setIsMobileMenuOpen}
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 h-dvh overflow-hidden">
         <Navbar
           title={titles[currentTab]}
           onRefresh={loadData}
           loading={loading}
+          onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
         />
 
-        <main className="flex-1 p-6 overflow-y-auto max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-3 sm:p-5 md:p-6 overflow-y-auto w-full max-w-7xl mx-auto">
           {currentTab === 'dashboard' && canAccessModule('dashboard') && (
             <DashboardView
               summary={summary}

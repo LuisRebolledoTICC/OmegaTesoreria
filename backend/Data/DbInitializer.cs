@@ -188,7 +188,7 @@ public static class DbInitializer
                     Finalidad = "Custodia principal y concentración de ingresos",
                     Tipo = "EFECTIVO",
                     Activa = true,
-                    SaldoActual = 5000.00m,
+                    SaldoActual = 0.00m,
                     CreadoPor = "admin",
                     FechaCreacion = DateTime.UtcNow,
                     EstadoVerificacion = "Verificado"
@@ -200,7 +200,7 @@ public static class DbInitializer
                     Finalidad = "Gastos menores y suministros de oficina",
                     Tipo = "EFECTIVO",
                     Activa = true,
-                    SaldoActual = 1500.00m,
+                    SaldoActual = 0.00m,
                     CreadoPor = "admin",
                     FechaCreacion = DateTime.UtcNow,
                     EstadoVerificacion = "Verificado"
@@ -212,7 +212,7 @@ public static class DbInitializer
                     Finalidad = "Recepción exclusiva de donativos y ofrendas",
                     Tipo = "EFECTIVO",
                     Activa = true,
-                    SaldoActual = 2500.00m,
+                    SaldoActual = 0.00m,
                     CreadoPor = "admin",
                     FechaCreacion = DateTime.UtcNow,
                     EstadoVerificacion = "Verificado"
@@ -224,7 +224,7 @@ public static class DbInitializer
                     Finalidad = "Reserva financiera institucional",
                     Tipo = "EFECTIVO",
                     Activa = true,
-                    SaldoActual = 1000.00m,
+                    SaldoActual = 0.00m,
                     CreadoPor = "admin",
                     FechaCreacion = DateTime.UtcNow,
                     EstadoVerificacion = "Verificado"
@@ -232,49 +232,6 @@ public static class DbInitializer
             };
 
             await context.Cajas.AddRangeAsync(cajas);
-            await context.SaveChangesAsync();
-
-            // Desglose de efectivo inicial para Caja Principal ($5,000 = 6x500 + 8x200 + 4x100)
-            var b500 = await context.Denominaciones.FirstOrDefaultAsync(d => d.Valor == 500 && d.Tipo == "Billete");
-            var b200 = await context.Denominaciones.FirstOrDefaultAsync(d => d.Valor == 200 && d.Tipo == "Billete");
-            var b100 = await context.Denominaciones.FirstOrDefaultAsync(d => d.Valor == 100 && d.Tipo == "Billete");
-            var b50 = await context.Denominaciones.FirstOrDefaultAsync(d => d.Valor == 50 && d.Tipo == "Billete");
-            var m10 = await context.Denominaciones.FirstOrDefaultAsync(d => d.Valor == 10 && d.Tipo == "Moneda");
-
-            var cajaPrin = cajas[0];
-            var cajaOp = cajas[1];
-
-            if (b500 != null && b200 != null && b100 != null)
-            {
-                context.CajasEfectivo.AddRange(
-                    new CajaEfectivo { CajaId = cajaPrin.Id, TipoEfectivo = "Billete", DenominacionId = b500.Id, Cantidad = 6 }, // 3000
-                    new CajaEfectivo { CajaId = cajaPrin.Id, TipoEfectivo = "Billete", DenominacionId = b200.Id, Cantidad = 8 }, // 1600
-                    new CajaEfectivo { CajaId = cajaPrin.Id, TipoEfectivo = "Billete", DenominacionId = b100.Id, Cantidad = 4 }  // 400 => total 5000
-                );
-            }
-
-            if (b200 != null && b100 != null && b50 != null && m10 != null)
-            {
-                context.CajasEfectivo.AddRange(
-                    new CajaEfectivo { CajaId = cajaOp.Id, TipoEfectivo = "Billete", DenominacionId = b200.Id, Cantidad = 5 }, // 1000
-                    new CajaEfectivo { CajaId = cajaOp.Id, TipoEfectivo = "Billete", DenominacionId = b100.Id, Cantidad = 3 }, // 300
-                    new CajaEfectivo { CajaId = cajaOp.Id, TipoEfectivo = "Billete", DenominacionId = b50.Id, Cantidad = 2 },  // 100
-                    new CajaEfectivo { CajaId = cajaOp.Id, TipoEfectivo = "Moneda", DenominacionId = m10.Id, Cantidad = 10 }   // 100 => total 1500
-                );
-            }
-
-            // Registrar operaciones iniciales de apertura en Auditoria
-            context.Auditoria.Add(new Auditoria
-            {
-                UsuarioId = 1,
-                UsuarioNombre = "admin",
-                Accion = "INICIALIZACION",
-                Entidad = "Sistema",
-                EntidadId = "0",
-                FechaHora = DateTime.UtcNow,
-                Descripcion = "Inicialización del sistema con 4 cajas y patrimonio total de $10,000.00 MXN"
-            });
-
             await context.SaveChangesAsync();
         }
     }

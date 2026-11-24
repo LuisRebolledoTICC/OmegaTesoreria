@@ -1,0 +1,28 @@
+# Compilaciones y dependencias
+bin/
+obj/
+node_modules/
+dist/
+.vs/
+.vscode/
+.idea/
+
+# Base de datos y claves en tiempo de ejecución
+backend/database/*.db
+backend/database/*.db-shm
+backend/database/*.db-wal
+backend/database/keys/
+database/
+*.db
+*.db-shm
+*.db-wal
+
+# Archivos de entorno y logs
+*.log
+.env
+.env.local
+.env.*.local
+
+# Archivos de sistema operativo
+Thumbs.db
+.DS_Store

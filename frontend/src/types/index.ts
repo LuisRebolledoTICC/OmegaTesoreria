@@ -156,3 +156,115 @@ export interface RespaldoInfo {
   tamanoBytes: number;
   fechaCreacion: string;
 }
+
+// --- MÓDULO VENTAS ---
+export interface VentaResumen {
+  id: number;
+  nombre: string;
+  fechaVenta: string;
+  estado: 'ABIERTA' | 'CERRADA';
+  fechaCreacion: string;
+  creadoPor: string;
+  fechaCierre?: string;
+  cerradoPor?: string;
+  totalPedidos: number;
+  pedidosPendientes: number;
+  pedidosEntregados: number;
+  pedidosCancelados: number;
+  totalVendido: number;
+  totalEfectivo: number;
+  totalTransferencia: number;
+  totalPendientePago: number;
+  entradaEfectivoOperacionId?: number;
+  entradaTransferenciaOperacionId?: number;
+}
+
+export interface VentaPresentacion {
+  id: number;
+  ventaProductoId: number;
+  nombre: string;
+  precio: number;
+  orden: number;
+}
+
+export interface VentaProducto {
+  id: number;
+  ventaId: number;
+  nombre: string;
+  descripcion?: string;
+  orden: number;
+  presentaciones: VentaPresentacion[];
+}
+
+export interface PedidoDetalle {
+  id: number;
+  pedidoId: number;
+  ventaPresentacionId?: number;
+  productoNombre: string;
+  presentacionNombre: string;
+  cantidad: number;
+  precioUnitario: number;
+  subtotal: number;
+}
+
+export interface PedidoPago {
+  id: number;
+  pedidoId: number;
+  metodoPago: 'EFECTIVO' | 'TRANSFERENCIA' | 'PENDIENTE';
+  importe: number;
+  referencia?: string;
+  fechaPago: string;
+}
+
+export interface Pedido {
+  id: number;
+  ventaId: number;
+  folio: number;
+  nombreCliente?: string;
+  fechaHora: string;
+  totalPedido: number;
+  estadoEntrega: 'PENDIENTE' | 'ENTREGADO' | 'CANCELADO';
+  estadoPago: 'PAGADO' | 'PARCIAL' | 'PENDIENTE';
+  observaciones?: string;
+  registradoPor: string;
+  detalles: PedidoDetalle[];
+  pagos: PedidoPago[];
+}
+
+export interface VentaMetricas {
+  totalPedidos: number;
+  pedidosPendientes: number;
+  pedidosEntregados: number;
+  pedidosCancelados: number;
+  totalVendido: number;
+  totalEfectivo: number;
+  totalTransferencia: number;
+  totalPendientePago: number;
+}
+
+export interface VentaDetalle {
+  id: number;
+  nombre: string;
+  fechaVenta: string;
+  estado: 'ABIERTA' | 'CERRADA';
+  fechaCreacion: string;
+  creadoPor: string;
+  fechaCierre?: string;
+  cerradoPor?: string;
+  entradaEfectivoOperacionId?: number;
+  entradaTransferenciaOperacionId?: number;
+  totalEfectivoIngresado: number;
+  totalTransferenciaIngresado: number;
+  metricas: VentaMetricas;
+  productos: VentaProducto[];
+  pedidos: Pedido[];
+}
+
+export interface RealizarEntradaVentaResult {
+  exito: boolean;
+  mensaje: string;
+  operacionEfectivoId?: number;
+  importeEfectivo: number;
+  operacionTransferenciaId?: number;
+  importeTransferencia: number;
+}

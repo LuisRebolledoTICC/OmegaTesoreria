@@ -9,7 +9,12 @@ import {
   ConteoRegistro,
   Operacion,
   DashboardSummary,
-  RespaldoInfo
+  RespaldoInfo,
+  VentaResumen,
+  VentaDetalle,
+  VentaProducto,
+  Pedido,
+  RealizarEntradaVentaResult
 } from '../types';
 
 // Detect host for LAN, Localhost and Embedded mode
@@ -338,5 +343,108 @@ export const api = {
 
   getExcelReportUrl(): string {
     return `${API_BASE_URL}/reportes/excel/general`;
+  },
+
+  // Ventas
+  async getVentas(): Promise<VentaResumen[]> {
+    const res = await fetch(`${API_BASE_URL}/ventas`, { headers: getHeaders() });
+    return handleResponse<VentaResumen[]>(res);
+  },
+
+  async getVentaById(id: number): Promise<VentaDetalle> {
+    const res = await fetch(`${API_BASE_URL}/ventas/${id}`, { headers: getHeaders() });
+    return handleResponse<VentaDetalle>(res);
+  },
+
+  async createVenta(data: { nombre: string; fechaVenta: string }): Promise<VentaResumen> {
+    const res = await fetch(`${API_BASE_URL}/ventas`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<VentaResumen>(res);
+  },
+
+  async updateVenta(id: number, data: { nombre: string; fechaVenta: string }): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/ventas/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    await handleResponse(res);
+  },
+
+  async deleteVenta(id: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/ventas/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    await handleResponse(res);
+  },
+
+  async saveProducto(
+    ventaId: number,
+    productoId: number | null,
+    data: { nombre: string; descripcion?: string; orden: number; presentaciones: { id?: number; nombre: string; precio: number; orden: number }[] }
+  ): Promise<VentaProducto> {
+    const url = productoId ? `${API_BASE_URL}/ventas/${ventaId}/productos?productoId=${productoId}` : `${API_BASE_URL}/ventas/${ventaId}/productos`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<VentaProducto>(res);
+  },
+
+  async deleteProducto(ventaId: number, productoId: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/ventas/${ventaId}/productos/${productoId}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    await handleResponse(res);
+  },
+
+  async createPedido(
+    ventaId: number,
+    data: {
+      nombreCliente?: string;
+      observaciones?: string;
+      estadoEntrega: string;
+      items: { ventaPresentacionId: number; cantidad: number }[];
+      pagos: { metodoPago: string; importe: number; referencia?: string }[];
+    }
+  ): Promise<Pedido> {
+    const res = await fetch(`${API_BASE_URL}/ventas/${ventaId}/pedidos`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<Pedido>(res);
+  },
+
+  async updateEstadoEntrega(ventaId: number, pedidoId: number, estadoEntrega: string): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/ventas/${ventaId}/pedidos/${pedidoId}/estado-entrega`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ estadoEntrega }),
+    });
+    await handleResponse(res);
+  },
+
+  async cancelarPedido(ventaId: number, pedidoId: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/ventas/${ventaId}/pedidos/${pedidoId}/cancelar`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    await handleResponse(res);
+  },
+
+  async realizarEntradaVenta(ventaId: number, cajaEfectivoId: number): Promise<RealizarEntradaVentaResult> {
+    const res = await fetch(`${API_BASE_URL}/ventas/${ventaId}/realizar-entrada`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ cajaEfectivoId }),
+    });
+    return handleResponse<RealizarEntradaVentaResult>(res);
   }
 };

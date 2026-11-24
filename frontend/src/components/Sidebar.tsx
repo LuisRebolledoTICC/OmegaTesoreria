@@ -9,12 +9,14 @@ import {
   Users,
   Database,
   ShieldCheck,
-  LogOut
+  LogOut,
+  ShoppingBag
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export type ActiveTab =
   | 'dashboard'
+  | 'ventas'
   | 'cajas'
   | 'conteo'
   | 'operaciones'
@@ -32,6 +34,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
 
   const navItems = [
     { id: 'dashboard' as ActiveTab, label: 'Dashboard', icon: LayoutDashboard, show: canAccessModule('dashboard') },
+    { id: 'ventas' as ActiveTab, label: 'Ventas y Pedidos', icon: ShoppingBag, show: canAccessModule('ventas') },
     { id: 'cajas' as ActiveTab, label: 'Cajas de Tesorería', icon: Wallet, show: canAccessModule('cajas') },
     { id: 'conteo' as ActiveTab, label: 'Conteo de Efectivo', icon: Calculator, show: canAccessModule('conteo') },
     { id: 'operaciones' as ActiveTab, label: 'Movimientos por Caja', icon: ArrowLeftRight, show: canAccessModule('operaciones') },

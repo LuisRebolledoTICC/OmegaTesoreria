@@ -98,6 +98,7 @@ else
 // 2. Dependency Injection
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITesoreriaService, TesoreriaService>();
+builder.Services.AddScoped<IVentasService, VentasService>();
 
 // 3. JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"]

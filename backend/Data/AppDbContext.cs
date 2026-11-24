@@ -21,6 +21,14 @@ public class AppDbContext : DbContext, IDataProtectionKeyContext
     public DbSet<Auditoria> Auditoria => Set<Auditoria>();
     public DbSet<RolPersonalizado> RolesPersonalizados => Set<RolPersonalizado>();
 
+    // Módulo Ventas
+    public DbSet<Venta> Ventas => Set<Venta>();
+    public DbSet<VentaProducto> VentaProductos => Set<VentaProducto>();
+    public DbSet<VentaPresentacion> VentaPresentaciones => Set<VentaPresentacion>();
+    public DbSet<Pedido> Pedidos => Set<Pedido>();
+    public DbSet<PedidoDetalle> PedidoDetalles => Set<PedidoDetalle>();
+    public DbSet<PedidoPago> PedidoPagos => Set<PedidoPago>();
+
     // Persistencia de claves criptográficas de ASP.NET Core Data Protection
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -45,6 +53,15 @@ public class AppDbContext : DbContext, IDataProtectionKeyContext
             modelBuilder.Entity<Conteo>().Property(c => c.TotalMonedas).HasConversion<double>();
             modelBuilder.Entity<Conteo>().Property(c => c.TotalBilletes).HasConversion<double>();
             modelBuilder.Entity<Conteo>().Property(c => c.TotalBolsas).HasConversion<double>();
+
+            // Ventas en SQLite
+            modelBuilder.Entity<Venta>().Property(v => v.TotalEfectivoIngresado).HasConversion<double>();
+            modelBuilder.Entity<Venta>().Property(v => v.TotalTransferenciaIngresado).HasConversion<double>();
+            modelBuilder.Entity<VentaPresentacion>().Property(p => p.Precio).HasConversion<double>();
+            modelBuilder.Entity<Pedido>().Property(p => p.TotalPedido).HasConversion<double>();
+            modelBuilder.Entity<PedidoDetalle>().Property(d => d.PrecioUnitario).HasConversion<double>();
+            modelBuilder.Entity<PedidoDetalle>().Property(d => d.Subtotal).HasConversion<double>();
+            modelBuilder.Entity<PedidoPago>().Property(p => p.Importe).HasConversion<double>();
         }
         else
         {
@@ -61,9 +78,48 @@ public class AppDbContext : DbContext, IDataProtectionKeyContext
             modelBuilder.Entity<Conteo>().Property(c => c.TotalMonedas).HasPrecision(18, 2);
             modelBuilder.Entity<Conteo>().Property(c => c.TotalBilletes).HasPrecision(18, 2);
             modelBuilder.Entity<Conteo>().Property(c => c.TotalBolsas).HasPrecision(18, 2);
+
+            // Ventas en PostgreSQL
+            modelBuilder.Entity<Venta>().Property(v => v.TotalEfectivoIngresado).HasPrecision(18, 2);
+            modelBuilder.Entity<Venta>().Property(v => v.TotalTransferenciaIngresado).HasPrecision(18, 2);
+            modelBuilder.Entity<VentaPresentacion>().Property(p => p.Precio).HasPrecision(18, 2);
+            modelBuilder.Entity<Pedido>().Property(p => p.TotalPedido).HasPrecision(18, 2);
+            modelBuilder.Entity<PedidoDetalle>().Property(d => d.PrecioUnitario).HasPrecision(18, 2);
+            modelBuilder.Entity<PedidoDetalle>().Property(d => d.Subtotal).HasPrecision(18, 2);
+            modelBuilder.Entity<PedidoPago>().Property(p => p.Importe).HasPrecision(18, 2);
         }
 
         // Relaciones
+        modelBuilder.Entity<Venta>()
+            .HasMany(v => v.Productos)
+            .WithOne(p => p.Venta)
+            .HasForeignKey(p => p.VentaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Venta>()
+            .HasMany(v => v.Pedidos)
+            .WithOne(p => p.Venta)
+            .HasForeignKey(p => p.VentaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<VentaProducto>()
+            .HasMany(p => p.Presentaciones)
+            .WithOne(pr => pr.VentaProducto)
+            .HasForeignKey(pr => pr.VentaProductoId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Pedido>()
+            .HasMany(p => p.Detalles)
+            .WithOne(d => d.Pedido)
+            .HasForeignKey(d => d.PedidoId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Pedido>()
+            .HasMany(p => p.Pagos)
+            .WithOne(pg => pg.Pedido)
+            .HasForeignKey(pg => pg.PedidoId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         modelBuilder.Entity<Operacion>()
             .HasOne(o => o.CajaOrigen)
             .WithMany()

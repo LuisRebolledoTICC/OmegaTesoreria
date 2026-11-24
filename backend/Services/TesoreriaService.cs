@@ -526,7 +526,8 @@ public class TesoreriaService : ITesoreriaService
         if (request.Importe <= 0)
             throw new InvalidOperationException("El importe debe ser mayor a cero.");
 
-        using var tx = await _context.Database.BeginTransactionAsync();
+        var isLocalTx = _context.Database.CurrentTransaction == null;
+        var tx = isLocalTx ? await _context.Database.BeginTransactionAsync() : null;
         try
         {
             var caja = await _context.Cajas
@@ -575,14 +576,27 @@ public class TesoreriaService : ITesoreriaService
             });
 
             await _context.SaveChangesAsync();
-            await tx.CommitAsync();
+            if (isLocalTx && tx != null)
+            {
+                await tx.CommitAsync();
+            }
 
             return (await GetOperacionByIdAsync(op.Id))!;
         }
         catch
         {
-            await tx.RollbackAsync();
+            if (isLocalTx && tx != null)
+            {
+                await tx.RollbackAsync();
+            }
             throw;
+        }
+        finally
+        {
+            if (isLocalTx && tx != null)
+            {
+                await tx.DisposeAsync();
+            }
         }
     }
 

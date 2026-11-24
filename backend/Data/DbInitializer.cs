@@ -32,29 +32,48 @@ public static class DbInitializer
                 new()
                 {
                     Nombre = "Administrador",
-                    Descripcion = "Control total del sistema, administración de usuarios, roles, cajas y auditoría.",
+                    Descripcion = "Control total del sistema, administración de usuarios, roles, cajas, ventas y auditoría.",
                     EsSistema = true,
-                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"conteo\",\"operaciones\",\"reportes\",\"usuarios\"]",
+                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"conteo\",\"operaciones\",\"ventas\",\"reportes\",\"usuarios\"]",
                     FechaCreacion = DateTime.UtcNow
                 },
                 new()
                 {
                     Nombre = "Tesorero",
-                    Descripcion = "Gestión de cajas, arqueos físicos de efectivo, entradas, salidas y transferencias.",
+                    Descripcion = "Gestión de cajas, arqueos físicos de efectivo, entradas, salidas, ventas y transferencias.",
                     EsSistema = true,
-                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"conteo\",\"operaciones\",\"reportes\"]",
+                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"conteo\",\"operaciones\",\"ventas\",\"reportes\"]",
                     FechaCreacion = DateTime.UtcNow
                 },
                 new()
                 {
                     Nombre = "Consulta",
-                    Descripcion = "Solo lectura de dashboard, saldos de cajas y reportes de tesorería.",
+                    Descripcion = "Solo lectura de dashboard, saldos de cajas, ventas y reportes de tesorería.",
                     EsSistema = true,
-                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"reportes\"]",
+                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"ventas\",\"reportes\"]",
                     FechaCreacion = DateTime.UtcNow
                 }
             };
             await context.RolesPersonalizados.AddRangeAsync(rolesBase);
+            await context.SaveChangesAsync();
+        }
+        else
+        {
+            // Asegurar que el módulo "ventas" esté habilitado en los roles base si no lo tenían
+            var roles = await context.RolesPersonalizados.ToListAsync();
+            foreach (var r in roles)
+            {
+                try
+                {
+                    var mods = System.Text.Json.JsonSerializer.Deserialize<List<string>>(r.ModulosPermitidosJson) ?? new();
+                    if (!mods.Contains("ventas"))
+                    {
+                        mods.Add("ventas");
+                        r.ModulosPermitidosJson = System.Text.Json.JsonSerializer.Serialize(mods);
+                    }
+                }
+                catch { }
+            }
             await context.SaveChangesAsync();
         }
 

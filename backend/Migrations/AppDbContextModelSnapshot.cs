@@ -382,6 +382,124 @@ namespace backend.Migrations
                     b.ToTable("Operaciones");
                 });
 
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.Pedido", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("EstadoEntrega")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("EstadoPago")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("FechaHora")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Folio")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("NombreCliente")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Observaciones")
+                        .HasColumnType("text");
+
+                    b.Property<string>("RegistradoPor")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("TotalPedido")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("VentaId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VentaId");
+
+                    b.ToTable("Pedidos");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.PedidoDetalle", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Cantidad")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PedidoId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("PrecioUnitario")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("PresentacionNombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProductoNombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Subtotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int?>("VentaPresentacionId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PedidoId");
+
+                    b.ToTable("PedidoDetalles");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.PedidoPago", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("FechaPago")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Importe")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("MetodoPago")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("PedidoId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Referencia")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PedidoId");
+
+                    b.ToTable("PedidoPagos");
+                });
+
             modelBuilder.Entity("OmegaTesoreria.Api.Models.RolPersonalizado", b =>
                 {
                     b.Property<int>("Id")
@@ -495,6 +613,114 @@ namespace backend.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.Venta", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CerradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CreadoPor")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int?>("EntradaEfectivoOperacionId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("EntradaTransferenciaOperacionId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("FechaCierre")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("FechaVenta")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("TotalEfectivoIngresado")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("TotalTransferenciaIngresado")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Ventas");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.VentaPresentacion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Orden")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Precio")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("VentaProductoId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VentaProductoId");
+
+                    b.ToTable("VentaPresentaciones");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.VentaProducto", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Descripcion")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Orden")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("VentaId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VentaId");
+
+                    b.ToTable("VentaProductos");
+                });
+
             modelBuilder.Entity("OmegaTesoreria.Api.Models.CajaEfectivo", b =>
                 {
                     b.HasOne("OmegaTesoreria.Api.Models.Caja", "Caja")
@@ -569,6 +795,39 @@ namespace backend.Migrations
                     b.Navigation("CajaOrigen");
                 });
 
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.Pedido", b =>
+                {
+                    b.HasOne("OmegaTesoreria.Api.Models.Venta", "Venta")
+                        .WithMany("Pedidos")
+                        .HasForeignKey("VentaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Venta");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.PedidoDetalle", b =>
+                {
+                    b.HasOne("OmegaTesoreria.Api.Models.Pedido", "Pedido")
+                        .WithMany("Detalles")
+                        .HasForeignKey("PedidoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Pedido");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.PedidoPago", b =>
+                {
+                    b.HasOne("OmegaTesoreria.Api.Models.Pedido", "Pedido")
+                        .WithMany("Pagos")
+                        .HasForeignKey("PedidoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Pedido");
+                });
+
             modelBuilder.Entity("OmegaTesoreria.Api.Models.TipoBolsa", b =>
                 {
                     b.HasOne("OmegaTesoreria.Api.Models.Caja", "Caja")
@@ -585,6 +844,28 @@ namespace backend.Migrations
                     b.Navigation("DenominacionAsociada");
                 });
 
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.VentaPresentacion", b =>
+                {
+                    b.HasOne("OmegaTesoreria.Api.Models.VentaProducto", "VentaProducto")
+                        .WithMany("Presentaciones")
+                        .HasForeignKey("VentaProductoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("VentaProducto");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.VentaProducto", b =>
+                {
+                    b.HasOne("OmegaTesoreria.Api.Models.Venta", "Venta")
+                        .WithMany("Productos")
+                        .HasForeignKey("VentaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Venta");
+                });
+
             modelBuilder.Entity("OmegaTesoreria.Api.Models.Caja", b =>
                 {
                     b.Navigation("EfectivoDisponible");
@@ -593,6 +874,25 @@ namespace backend.Migrations
             modelBuilder.Entity("OmegaTesoreria.Api.Models.Operacion", b =>
                 {
                     b.Navigation("Detalles");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.Pedido", b =>
+                {
+                    b.Navigation("Detalles");
+
+                    b.Navigation("Pagos");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.Venta", b =>
+                {
+                    b.Navigation("Pedidos");
+
+                    b.Navigation("Productos");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.VentaProducto", b =>
+                {
+                    b.Navigation("Presentaciones");
                 });
 #pragma warning restore 612, 618
         }

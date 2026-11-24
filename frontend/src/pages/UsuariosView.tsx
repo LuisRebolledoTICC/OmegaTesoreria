@@ -22,6 +22,7 @@ import { api } from '../services/api';
 
 const MODULOS_DISPONIBLES = [
   { id: 'dashboard', nombre: 'Dashboard General', descripcion: 'Panel general con balances y gráficos' },
+  { id: 'ventas', nombre: 'Ventas y Pedidos', descripcion: 'Gestión de jornadas de venta, productos, pedidos y entradas' },
   { id: 'cajas', nombre: 'Cajas de Tesorería', descripcion: 'Listado, creación y configuración de cajas' },
   { id: 'conteo', nombre: 'Conteo Físico de Efectivo', descripcion: 'Arqueos y desglose de monedas, billetes y bolsas' },
   { id: 'operaciones', nombre: 'Movimientos por Caja', descripcion: 'Entradas, salidas y transferencias' },

@@ -10,6 +10,7 @@ import { OperacionesView } from './pages/OperacionesView';
 import { ReportesView } from './pages/ReportesView';
 import { UsuariosView } from './pages/UsuariosView';
 import { RespaldosView } from './pages/RespaldosView';
+import { VentasView } from './pages/VentasView';
 import { Caja, DashboardSummary } from './types';
 import { api } from './services/api';
 
@@ -54,6 +55,7 @@ const MainLayout: React.FC = () => {
 
   const titles: Record<ActiveTab, string> = {
     dashboard: 'Panel General de Tesorería',
+    ventas: 'Ventas y Pedidos',
     cajas: 'Administración de Cajas',
     conteo: 'Conteo Físico de Efectivo',
     operaciones: 'Movimientos por Cada Caja',
@@ -85,6 +87,13 @@ const MainLayout: React.FC = () => {
               loading={loading}
               onNavigateToConteo={handleNavigateToConteo}
               setActiveTab={setActiveTab}
+            />
+          )}
+
+          {activeTab === 'ventas' && (
+            <VentasView
+              cajas={cajas}
+              onEntradaRealizada={loadData}
             />
           )}
 

@@ -22,17 +22,12 @@ COPY --from=build-frontend /app/frontend/dist ./backend/wwwroot
 WORKDIR /src/backend
 RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
 
-# Etapa 3: Imagen Final de Ejecución
+# Etapa 3: Imagen Final de Ejecución (Ligera)
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
 
-# Puerto por defecto (sobreescribible por nubes como Render/Railway mediante la variable PORT)
 ENV PORT=8080
 ENV ASPNETCORE_ENVIRONMENT=Production
-ENV DATABASE_DIR=/app/database
-
-# Directorio para persistencia de base de datos SQLite
-RUN mkdir -p /app/database
 
 COPY --from=build-backend /app/publish .
 

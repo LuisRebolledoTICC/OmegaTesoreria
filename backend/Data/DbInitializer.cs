@@ -9,12 +9,20 @@ public static class DbInitializer
 {
     public static async Task InitializeAsync(AppDbContext context)
     {
-        // Automatically create DB and apply migrations
-        await context.Database.EnsureCreatedAsync();
+        bool isSqlite = context.Database.ProviderName?.Contains("Sqlite", StringComparison.OrdinalIgnoreCase) == true;
 
-        // Asegurar que las columnas nuevas existan de forma idempotente sin disparar excepciones
-        await AddColumnIfNotExistsAsync(context, "TiposBolsas", "CajaId", "INTEGER NULL REFERENCES Cajas(Id)");
-        await AddColumnIfNotExistsAsync(context, "Cajas", "Tipo", "TEXT NOT NULL DEFAULT 'EFECTIVO'");
+        if (isSqlite)
+        {
+            // Para SQLite local
+            await context.Database.EnsureCreatedAsync();
+            await AddColumnIfNotExistsAsync(context, "TiposBolsas", "CajaId", "INTEGER NULL REFERENCES Cajas(Id)");
+            await AddColumnIfNotExistsAsync(context, "Cajas", "Tipo", "TEXT NOT NULL DEFAULT 'EFECTIVO'");
+        }
+        else
+        {
+            // Para PostgreSQL en producción (Neon), aplicar migraciones formales de EF Core
+            await context.Database.MigrateAsync();
+        }
 
         // Si no existe ninguna caja de transferencias, crearla automáticamente
         if (!await context.Cajas.AnyAsync(c => c.Tipo == "TRANSFERENCIAS"))
@@ -68,17 +76,16 @@ public static class DbInitializer
 
             var bolsas = new List<TipoBolsa>
             {
-                new() { Nombre = "Bolsa de monedas de $5", Descripcion = "20 monedas de $5.00", ValorUnitario = 100.00m, DenominacionAsociadaId = den5?.Id, Activa = true },
-                new() { Nombre = "Bolsa de monedas de $10", Descripcion = "20 monedas de $10.00", ValorUnitario = 200.00m, DenominacionAsociadaId = den10?.Id, Activa = true },
-                new() { Nombre = "Bolsa de monedas de $2", Descripcion = "50 monedas de $2.00", ValorUnitario = 100.00m, DenominacionAsociadaId = den2?.Id, Activa = true },
-                new() { Nombre = "Bolsa personalizada", Descripcion = "Bolsa de valor fijo especial", ValorUnitario = 150.00m, Activa = true }
+                new() { Nombre = "Bolsa $500 (Monedas $10)", Descripcion = "50 monedas de $10", DenominacionAsociadaId = den10?.Id, ValorUnitario = 500.00m, Activa = true },
+                new() { Nombre = "Bolsa $200 (Monedas $5)", Descripcion = "40 monedas de $5", DenominacionAsociadaId = den5?.Id, ValorUnitario = 200.00m, Activa = true },
+                new() { Nombre = "Bolsa $100 (Monedas $2)", Descripcion = "50 monedas de $2", DenominacionAsociadaId = den2?.Id, ValorUnitario = 100.00m, Activa = true }
             };
 
             await context.TiposBolsas.AddRangeAsync(bolsas);
             await context.SaveChangesAsync();
         }
 
-        // 3. Seed Users
+        // 3. Seed Usuarios (Idempotente)
         if (!await context.Users.AnyAsync())
         {
             var users = new List<User>
@@ -87,7 +94,7 @@ public static class DbInitializer
                 {
                     UserName = "admin",
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!"),
-                    Nombre = "Administrador General",
+                    Nombre = "Administrador del Sistema",
                     Rol = "Administrador",
                     Activo = true,
                     FechaCreacion = DateTime.UtcNow
@@ -96,7 +103,7 @@ public static class DbInitializer
                 {
                     UserName = "tesorero",
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("Tesorero123!"),
-                    Nombre = "Tesorero Principal",
+                    Nombre = "Tesorero General",
                     Rol = "Tesorero",
                     Activo = true,
                     FechaCreacion = DateTime.UtcNow
@@ -116,57 +123,57 @@ public static class DbInitializer
             await context.SaveChangesAsync();
         }
 
-        // 4. Seed Cajas iniciales (conforme al ejemplo de la Sección 1.2 del documento)
-        if (!await context.Cajas.AnyAsync())
+        // 4. Seed Cajas Iniciales
+        if (!await context.Cajas.AnyAsync(c => c.Tipo == "EFECTIVO"))
         {
             var cajas = new List<Caja>
             {
                 new()
                 {
-                    Nombre = "Caja principal",
-                    Descripcion = "Fondo general para resguardo y pagos mayores",
-                    Finalidad = "Custodia general de tesorería",
+                    Nombre = "Caja Principal",
+                    Descripcion = "Caja fuerte central de tesorería para custodia de fondos generales.",
+                    Finalidad = "Custodia principal y concentración de ingresos",
+                    Tipo = "EFECTIVO",
                     Activa = true,
                     SaldoActual = 5000.00m,
                     CreadoPor = "admin",
                     FechaCreacion = DateTime.UtcNow,
-                    UltimoConteoFecha = DateTime.UtcNow,
                     EstadoVerificacion = "Verificado"
                 },
                 new()
                 {
-                    Nombre = "Caja operativa",
-                    Descripcion = "Gastos menores diarios y operación corriente",
-                    Finalidad = "Operación diaria y compras menores",
+                    Nombre = "Caja Chica / Operaciones",
+                    Descripcion = "Fondo rotatorio para gastos menores diarios y pagos inmediatos.",
+                    Finalidad = "Gastos menores y suministros de oficina",
+                    Tipo = "EFECTIVO",
                     Activa = true,
                     SaldoActual = 1500.00m,
                     CreadoPor = "admin",
                     FechaCreacion = DateTime.UtcNow,
-                    UltimoConteoFecha = DateTime.UtcNow,
                     EstadoVerificacion = "Verificado"
                 },
                 new()
                 {
-                    Nombre = "Caja de eventos",
-                    Descripcion = "Recursos destinados a retiros, conferencias y actividades",
-                    Finalidad = "Logística y gastos de eventos",
+                    Nombre = "Caja de Ofrendas",
+                    Descripcion = "Caja receptora de ofrendas y colectas de servicios dominicales.",
+                    Finalidad = "Recepción exclusiva de donativos y ofrendas",
+                    Tipo = "EFECTIVO",
                     Activa = true,
                     SaldoActual = 2500.00m,
                     CreadoPor = "admin",
                     FechaCreacion = DateTime.UtcNow,
-                    UltimoConteoFecha = DateTime.UtcNow,
                     EstadoVerificacion = "Verificado"
                 },
                 new()
                 {
-                    Nombre = "Caja de donaciones",
-                    Descripcion = "Donaciones en efectivo de miembros y bienhechores",
-                    Finalidad = "Recepción de donativos y aportaciones",
+                    Nombre = "Caja Fondo de Emergencia",
+                    Descripcion = "Reserva especial para imprevistos mayores o proyectos especiales.",
+                    Finalidad = "Reserva financiera institucional",
+                    Tipo = "EFECTIVO",
                     Activa = true,
                     SaldoActual = 1000.00m,
                     CreadoPor = "admin",
                     FechaCreacion = DateTime.UtcNow,
-                    UltimoConteoFecha = DateTime.UtcNow,
                     EstadoVerificacion = "Verificado"
                 }
             };
@@ -180,7 +187,6 @@ public static class DbInitializer
             var b100 = await context.Denominaciones.FirstOrDefaultAsync(d => d.Valor == 100 && d.Tipo == "Billete");
             var b50 = await context.Denominaciones.FirstOrDefaultAsync(d => d.Valor == 50 && d.Tipo == "Billete");
             var m10 = await context.Denominaciones.FirstOrDefaultAsync(d => d.Valor == 10 && d.Tipo == "Moneda");
-            var m5 = await context.Denominaciones.FirstOrDefaultAsync(d => d.Valor == 5 && d.Tipo == "Moneda");
 
             var cajaPrin = cajas[0];
             var cajaOp = cajas[1];
@@ -260,7 +266,7 @@ public static class DbInitializer
         }
         catch
         {
-            // Salvaguarda adicional en caso de que el proveedor o conexión no soporte PRAGMA
+            // Salvaguarda
         }
     }
 }

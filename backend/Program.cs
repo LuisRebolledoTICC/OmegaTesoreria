@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 using OmegaTesoreria.Api.Data;
 using OmegaTesoreria.Api.Services;
 
@@ -16,41 +17,101 @@ if (!string.IsNullOrEmpty(port))
     builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 }
 
-// 1. Ensure database directory exists
-var customDbDir = Environment.GetEnvironmentVariable("DATABASE_DIR");
-var dbDirectory = !string.IsNullOrEmpty(customDbDir)
-    ? Path.GetFullPath(customDbDir)
-    : Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "../database"));
+// 1. Configuración de Base de Datos (PostgreSQL en Producción / SQLite en Local)
+var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+var defaultConn = builder.Configuration.GetConnectionString("DefaultConnection");
 
-if (!Directory.Exists(dbDirectory))
+string? postgresConnString = null;
+
+// Solo tratar como PostgreSQL si viene en DATABASE_URL o si contiene keywords de postgres / Host=
+var candidateConn = !string.IsNullOrEmpty(databaseUrl) ? databaseUrl : defaultConn;
+
+if (!string.IsNullOrEmpty(candidateConn) &&
+    (candidateConn.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) ||
+     candidateConn.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase) ||
+     candidateConn.Contains("Host=", StringComparison.OrdinalIgnoreCase) ||
+     candidateConn.Contains("Server=", StringComparison.OrdinalIgnoreCase)))
 {
-    Directory.CreateDirectory(dbDirectory);
+    if (candidateConn.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) ||
+        candidateConn.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
+    {
+        // Parsear URL de estilo postgres://user:pass@host:port/database común en Neon y Render
+        var uri = new Uri(candidateConn);
+        var userInfo = uri.UserInfo.Split(':');
+        var npgsqlBuilder = new NpgsqlConnectionStringBuilder
+        {
+            Host = uri.Host,
+            Port = uri.Port > 0 ? uri.Port : 5432,
+            Username = userInfo[0],
+            Password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "",
+            Database = uri.AbsolutePath.TrimStart('/'),
+            SslMode = SslMode.Require,
+            Pooling = true
+        };
+        postgresConnString = npgsqlBuilder.ToString();
+    }
+    else
+    {
+        postgresConnString = candidateConn;
+    }
 }
 
-var keysDirectory = Path.Combine(dbDirectory, "keys");
-if (!Directory.Exists(keysDirectory))
+if (!string.IsNullOrEmpty(postgresConnString))
 {
-    Directory.CreateDirectory(keysDirectory);
+    Console.WriteLine("[Database] Configurando proveedor PostgreSQL (Neon Cloud)...");
+    builder.Services.AddDbContext<AppDbContext>(options =>
+    {
+        options.UseNpgsql(postgresConnString);
+    });
+
+    // En producción con PostgreSQL, persistir las claves de Data Protection en la base de datos
+    builder.Services.AddDataProtection()
+        .SetApplicationName("OmegaTesoreria")
+        .PersistKeysToDbContext<AppDbContext>();
+}
+else
+{
+    Console.WriteLine("[Database] No se detectó DATABASE_URL. Usando SQLite local...");
+    var customDbDir = Environment.GetEnvironmentVariable("DATABASE_DIR");
+    var dbDirectory = !string.IsNullOrEmpty(customDbDir)
+        ? Path.GetFullPath(customDbDir)
+        : Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "../database"));
+
+    if (!Directory.Exists(dbDirectory)) Directory.CreateDirectory(dbDirectory);
+
+    var keysDirectory = Path.Combine(dbDirectory, "keys");
+    if (!Directory.Exists(keysDirectory)) Directory.CreateDirectory(keysDirectory);
+
+    var dbPath = Path.Combine(dbDirectory, "tesoreria.db");
+    var sqliteConnString = $"Data Source={dbPath}";
+
+    builder.Services.AddDbContext<AppDbContext>(options =>
+    {
+        options.UseSqlite(sqliteConnString);
+    });
+
+    builder.Services.AddDataProtection()
+        .SetApplicationName("OmegaTesoreria")
+        .PersistKeysToFileSystem(new DirectoryInfo(keysDirectory));
 }
 
-var dbPath = Path.Combine(dbDirectory, "tesoreria.db");
-var connectionString = $"Data Source={dbPath}";
-
-builder.Services.AddDataProtection()
-    .PersistKeysToFileSystem(new DirectoryInfo(keysDirectory));
-
-// 2. DbContext SQLite
-builder.Services.AddDbContext<AppDbContext>(options =>
-{
-    options.UseSqlite(connectionString);
-});
-
-// 3. Dependency Injection
+// 2. Dependency Injection
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITesoreriaService, TesoreriaService>();
 
-// 4. JWT Authentication
-var jwtKey = builder.Configuration["Jwt:Key"] ?? "OmegaSecretKeyForTreasuryManagementApplicationLocalSecure2026!";
+// 3. JWT Authentication
+var jwtKey = builder.Configuration["Jwt:Key"]
+    ?? Environment.GetEnvironmentVariable("Jwt__Key")
+    ?? "OmegaSecretKeyForTreasuryManagementApplicationLocalSecure2026!";
+
+var jwtIssuer = builder.Configuration["Jwt:Issuer"]
+    ?? Environment.GetEnvironmentVariable("Jwt__Issuer")
+    ?? "OmegaTesoreria";
+
+var jwtAudience = builder.Configuration["Jwt:Audience"]
+    ?? Environment.GetEnvironmentVariable("Jwt__Audience")
+    ?? "OmegaTesoreriaClients";
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -60,15 +121,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "OmegaTesoreria",
-            ValidAudience = builder.Configuration["Jwt:Audience"] ?? "OmegaTesoreriaClients",
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
         };
     });
 
 builder.Services.AddAuthorization();
 
-// 5. CORS for local and LAN access
+// 4. CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowLocalAndLAN", policy =>
@@ -79,7 +140,7 @@ builder.Services.AddCors(options =>
     });
 });
 
-// 6. Controllers and JSON options
+// 5. Controllers y JSON options
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -91,7 +152,7 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// 7. Auto database migration and seeding
+// 6. Migraciones automáticas e inicialización de datos
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();

@@ -308,8 +308,104 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
           </div>
         </div>
 
-        {/* Tabla de Movimientos */}
-        <div className="overflow-x-auto">
+        {/* Vista Móvil en Tarjetas (< md) */}
+        <div className="md:hidden p-3 space-y-3 bg-slate-50/60">
+          {loading ? (
+            <div className="p-6 text-center text-xs text-slate-500 bg-white rounded-xl border border-slate-200">
+              Cargando movimientos...
+            </div>
+          ) : movimientos.length === 0 ? (
+            <div className="p-6 text-center text-xs text-slate-500 bg-white rounded-xl border border-slate-200">
+              No hay movimientos registrados para esta caja.
+            </div>
+          ) : (
+            movimientos.map((op) => (
+              <div
+                key={op.id}
+                className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-2xs space-y-2.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center flex-wrap gap-1.5 min-w-0">
+                    <span className="font-mono font-bold text-xs text-slate-500">#{op.id}</span>
+                    <span
+                      className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                        op.tipoOperacion === 'ENTRADA'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : op.tipoOperacion === 'SALIDA'
+                          ? 'bg-rose-100 text-rose-800'
+                          : op.tipoOperacion === 'TRANSFERENCIA'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-purple-100 text-purple-800'
+                      }`}
+                    >
+                      {op.tipoOperacion}
+                    </span>
+                    <span
+                      className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                        op.estado === 'CONFIRMADA'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-red-50 text-red-700 border border-red-200 line-through'
+                      }`}
+                    >
+                      {op.estado}
+                    </span>
+                  </div>
+                  <span
+                    className={`text-sm font-extrabold whitespace-nowrap shrink-0 ${
+                      op.tipoOperacion === 'ENTRADA'
+                        ? 'text-emerald-600'
+                        : op.tipoOperacion === 'SALIDA'
+                        ? 'text-rose-600'
+                        : 'text-slate-900'
+                    }`}
+                  >
+                    {op.tipoOperacion === 'ENTRADA' ? '+' : op.tipoOperacion === 'SALIDA' ? '-' : ''}
+                    {formatMoney(op.importe)}
+                  </span>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold text-slate-900">{op.concepto}</p>
+                  {op.descripcion && <p className="text-[11px] text-slate-500 mt-0.5">{op.descripcion}</p>}
+                </div>
+
+                <div className="grid grid-cols-1 gap-1 pt-2 border-t border-slate-100 text-[11px] text-slate-600">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-400">Caja(s):</span>
+                    <span className="font-semibold text-slate-800 text-right">
+                      {op.tipoOperacion === 'TRANSFERENCIA'
+                        ? `${op.cajaOrigenNombre} ➔ ${op.cajaDestinoNombre}`
+                        : op.cajaDestinoNombre || op.cajaOrigenNombre || '-'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-400">Fecha:</span>
+                    <span className="text-right">{new Date(op.fechaOperacion).toLocaleString('es-MX')}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-400">Responsable:</span>
+                    <span className="font-medium text-slate-700 text-right">{op.usuarioNombre}</span>
+                  </div>
+                </div>
+
+                {isAdmin && op.estado === 'CONFIRMADA' && op.tipoOperacion !== 'REVERSA' && (
+                  <div className="pt-2 border-t border-slate-100 flex justify-end">
+                    <button
+                      onClick={() => setAnulandoOpId(op.id)}
+                      className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Revertir Movimiento</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Tabla de Movimientos (Desktop y Tablet >= md) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider border-b border-slate-200">
               <tr>

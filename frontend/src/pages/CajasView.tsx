@@ -419,7 +419,34 @@ export const CajasView: React.FC<CajasViewProps> = ({ cajas, onRefresh, onNaviga
               ) : (
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Composición Física Actual:</h4>
-                  <div className="overflow-x-auto border border-slate-200 rounded-lg">
+
+                  {/* Móvil en tarjetas (< md) */}
+                  <div className="md:hidden space-y-2">
+                    {selectedCaja.desgloseEfectivo.map((item, idx) => (
+                      <div key={idx} className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 flex items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center space-x-2 min-w-0">
+                          {item.tipoEfectivo === 'Moneda' ? (
+                            <Coins className="w-4 h-4 text-amber-500 shrink-0" />
+                          ) : item.tipoEfectivo === 'Billete' ? (
+                            <Banknote className="w-4 h-4 text-emerald-600 shrink-0" />
+                          ) : (
+                            <Package className="w-4 h-4 text-blue-600 shrink-0" />
+                          )}
+                          <div className="min-w-0">
+                            <p className="font-semibold text-slate-900 truncate">{item.denominacionNombre || item.tipoBolsaNombre}</p>
+                            <p className="text-[11px] text-slate-500">Unit: {formatMoney(item.valorUnitario)}</p>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-bold text-slate-900">{formatMoney(item.subtotal)}</p>
+                          <p className="text-[11px] text-slate-500">Cant: {item.cantidad}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop/Tablet en tabla (>= md) */}
+                  <div className="hidden md:block overflow-x-auto border border-slate-200 rounded-lg">
                     <table className="w-full text-xs text-left whitespace-nowrap">
                     <thead className="bg-slate-100 text-slate-700 font-bold">
                       <tr>

@@ -554,10 +554,10 @@ export const ConteoEfectivoView: React.FC<ConteoEfectivoViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Box Selector & Header */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-slate-800 flex items-center space-x-2">
-            <Calculator className="w-5 h-5 text-amber-600" />
+      <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="text-lg sm:text-xl font-bold text-slate-800 flex items-center space-x-2">
+            <Calculator className="w-5 h-5 text-amber-600 shrink-0" />
             <span>Control y Conteo Físico de Efectivo</span>
           </h2>
           <p className="text-xs text-slate-500">
@@ -565,12 +565,12 @@ export const ConteoEfectivoView: React.FC<ConteoEfectivoViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
-          <label className="text-xs font-bold text-slate-700 uppercase">Caja a Contar:</label>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3 w-full md:w-auto min-w-0">
+          <label className="text-xs font-bold text-slate-700 uppercase shrink-0">Caja a Contar:</label>
           <select
             value={activeCajaId}
             onChange={(e) => setActiveCajaId(Number(e.target.value))}
-            className="px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+            className="w-full md:w-auto md:max-w-xs min-w-0 max-w-full truncate px-3.5 py-2.5 sm:py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
           >
             {cajas.filter(c => c.activa).map(c => (
               <option key={c.id} value={c.id}>

@@ -13,10 +13,24 @@ import { RespaldosView } from './pages/RespaldosView';
 import { VentasView } from './pages/VentasView';
 import { Caja, DashboardSummary } from './types';
 import { api } from './services/api';
+import { Lock } from 'lucide-react';
+
+const ORDERED_TABS: ActiveTab[] = [
+  'dashboard',
+  'ventas',
+  'cajas',
+  'conteo',
+  'operaciones',
+  'reportes',
+  'usuarios',
+];
 
 const MainLayout: React.FC = () => {
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const { user, canAccessModule, logout } = useAuth();
+  const availableTabs = ORDERED_TABS.filter((t) => canAccessModule(t));
+  const firstAvailableTab = availableTabs[0] || null;
+
+  const [activeTab, setActiveTab] = useState<ActiveTab | null>(() => firstAvailableTab);
   const [cajas, setCajas] = useState<Caja[]>([]);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [selectedCajaIdForConteo, setSelectedCajaIdForConteo] = useState<number | null>(null);
@@ -44,13 +58,49 @@ const MainLayout: React.FC = () => {
     }
   }, [user]);
 
+  // Redirigir automáticamente al primer módulo permitido si no hay pestaña o si se pierde acceso
+  useEffect(() => {
+    if (user) {
+      if (!activeTab || !canAccessModule(activeTab)) {
+        if (firstAvailableTab) {
+          setActiveTab(firstAvailableTab);
+        }
+      }
+    }
+  }, [user, user?.modulosPermitidos, activeTab, firstAvailableTab]);
+
   if (!user) {
     return <LoginView />;
   }
 
+  // Pantalla cuando el usuario no tiene ningún módulo disponible
+  if (availableTabs.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center shadow-2xl border border-slate-200">
+          <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4 text-amber-600">
+            <Lock className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Sin módulos disponibles</h2>
+          <p className="text-sm text-slate-600 mb-6 leading-relaxed">
+            Tu cuenta (<span className="font-semibold text-slate-800">{user.userName}</span>) no tiene permisos asignados para acceder a ningún apartado del sistema. Contacta a un administrador para que habilite módulos a tu rol.
+          </p>
+          <button
+            onClick={logout}
+            className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-sm transition"
+          >
+            Cerrar Sesión
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const handleNavigateToConteo = (cajaId: number) => {
     setSelectedCajaIdForConteo(cajaId);
-    setActiveTab('conteo');
+    if (canAccessModule('conteo')) {
+      setActiveTab('conteo');
+    }
   };
 
   const titles: Record<ActiveTab, string> = {
@@ -63,41 +113,49 @@ const MainLayout: React.FC = () => {
     usuarios: 'Administración de Usuarios y Permisos',
   };
 
+  const currentTab = (activeTab && canAccessModule(activeTab) ? activeTab : firstAvailableTab) as ActiveTab;
+
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans">
       {/* Sidebar fijo */}
       <Sidebar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        activeTab={currentTab}
+        setActiveTab={(tab) => {
+          if (canAccessModule(tab)) {
+            setActiveTab(tab);
+          }
+        }}
         selectedCajaIdForConteo={selectedCajaIdForConteo}
       />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Navbar
-          title={titles[activeTab]}
+          title={titles[currentTab]}
           onRefresh={loadData}
           loading={loading}
         />
 
         <main className="flex-1 p-6 overflow-y-auto max-w-7xl w-full mx-auto">
-          {activeTab === 'dashboard' && (
+          {currentTab === 'dashboard' && canAccessModule('dashboard') && (
             <DashboardView
               summary={summary}
               loading={loading}
               onNavigateToConteo={handleNavigateToConteo}
-              setActiveTab={setActiveTab}
+              setActiveTab={(tab) => {
+                if (canAccessModule(tab)) setActiveTab(tab);
+              }}
             />
           )}
 
-          {activeTab === 'ventas' && (
+          {currentTab === 'ventas' && canAccessModule('ventas') && (
             <VentasView
               cajas={cajas}
               onEntradaRealizada={loadData}
             />
           )}
 
-          {activeTab === 'cajas' && (
+          {currentTab === 'cajas' && canAccessModule('cajas') && (
             <CajasView
               cajas={cajas}
               onRefresh={loadData}
@@ -105,7 +163,7 @@ const MainLayout: React.FC = () => {
             />
           )}
 
-          {activeTab === 'conteo' && (
+          {currentTab === 'conteo' && canAccessModule('conteo') && (
             <ConteoEfectivoView
               cajas={cajas}
               selectedCajaId={selectedCajaIdForConteo}
@@ -113,21 +171,21 @@ const MainLayout: React.FC = () => {
             />
           )}
 
-          {activeTab === 'operaciones' && (
+          {currentTab === 'operaciones' && canAccessModule('operaciones') && (
             <OperacionesView
               cajas={cajas}
               onOperationCompleted={loadData}
             />
           )}
 
-          {activeTab === 'reportes' && (
+          {currentTab === 'reportes' && canAccessModule('reportes') && (
             <ReportesView
               summary={summary}
               cajas={cajas}
             />
           )}
 
-          {activeTab === 'usuarios' && <UsuariosView />}
+          {currentTab === 'usuarios' && canAccessModule('usuarios') && <UsuariosView />}
         </main>
       </div>
     </div>

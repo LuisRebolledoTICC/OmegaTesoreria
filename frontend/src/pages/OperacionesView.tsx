@@ -20,7 +20,7 @@ interface OperacionesViewProps {
 }
 
 export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOperationCompleted }) => {
-  const { user, isAdmin, canOperate } = useAuth();
+  const { user, isAdmin, canOperate, canAccessModule } = useAuth();
   const [selectedCajaId, setSelectedCajaId] = useState<number | ''>('');
   const [operacionModal, setOperacionModal] = useState<'entrada' | 'salida' | 'transferencia' | null>(null);
 
@@ -164,13 +164,15 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
 
         {canOperate && (
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => openModal('entrada')}
-              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center space-x-1.5 transition shadow-xs"
-            >
-              <ArrowDownLeft className="w-4 h-4" />
-              <span>Nueva Entrada</span>
-            </button>
+            {canAccessModule('entradas') && (
+              <button
+                onClick={() => openModal('entrada')}
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center space-x-1.5 transition shadow-xs"
+              >
+                <ArrowDownLeft className="w-4 h-4" />
+                <span>Nueva Entrada</span>
+              </button>
+            )}
             <button
               onClick={() => openModal('salida')}
               className="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs flex items-center space-x-1.5 transition shadow-xs"
@@ -247,12 +249,14 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
 
               {canOperate && (
                 <div className="flex items-center space-x-1.5 border-l pl-3 border-amber-200">
-                  <button
-                    onClick={() => openModal('entrada')}
-                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold text-[11px] flex items-center space-x-1"
-                  >
-                    <span>+ Entrada</span>
-                  </button>
+                  {canAccessModule('entradas') && (
+                    <button
+                      onClick={() => openModal('entrada')}
+                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold text-[11px] flex items-center space-x-1"
+                    >
+                      <span>+ Entrada</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => openModal('salida')}
                     className="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded font-bold text-[11px] flex items-center space-x-1"

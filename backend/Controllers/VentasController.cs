@@ -12,10 +12,12 @@ namespace OmegaTesoreria.Api.Controllers;
 public class VentasController : ControllerBase
 {
     private readonly IVentasService _ventasService;
+    private readonly IAuthService _authService;
 
-    public VentasController(IVentasService ventasService)
+    public VentasController(IVentasService ventasService, IAuthService authService)
     {
         _ventasService = ventasService;
+        _authService = authService;
     }
 
     private string GetCurrentUserName() => User.Identity?.Name ?? "Sistema";
@@ -179,7 +181,13 @@ public class VentasController : ControllerBase
     {
         try
         {
-            var result = await _ventasService.RealizarEntradaAsync(id, request, GetCurrentUserId(), GetCurrentUserName());
+            var userName = GetCurrentUserName();
+            if (!await _authService.HasPermissionAsync(userName, "entradas"))
+            {
+                return StatusCode(403, new { message = "No tienes permiso para realizar entradas en Tesorería." });
+            }
+
+            var result = await _ventasService.RealizarEntradaAsync(id, request, GetCurrentUserId(), userName);
             return Ok(result);
         }
         catch (Exception ex)

@@ -64,7 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     // Fallback por defecto si no vienen modulos explícitos
     if (modulo === 'dashboard' || modulo === 'cajas' || modulo === 'reportes') return true;
-    if (modulo === 'conteo' || modulo === 'operaciones') return isTesorero;
+    if (modulo === 'conteo' || modulo === 'operaciones' || modulo === 'entradas') return isTesorero;
     if (modulo === 'usuarios') return isAdmin;
     return false;
   };

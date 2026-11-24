@@ -28,7 +28,7 @@ interface CajasViewProps {
 }
 
 export const CajasView: React.FC<CajasViewProps> = ({ cajas, onRefresh, onNavigateToConteo }) => {
-  const { isAdmin, canOperate } = useAuth();
+  const { isAdmin, canOperate, canAccessModule } = useAuth();
   const [selectedCaja, setSelectedCaja] = useState<Caja | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [includeInactive, setIncludeInactive] = useState(true);
@@ -314,15 +314,17 @@ export const CajasView: React.FC<CajasViewProps> = ({ cajas, onRefresh, onNaviga
                     <>
                       {esTransferencias ? (
                         <>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenQuickOp(caja, 'ENTRADA')}
-                            className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold text-xs flex items-center space-x-1 transition shadow-2xs"
-                            title="Apuntar Entrada / Depósito por transferencia"
-                          >
-                            <ArrowDownRight className="w-3.5 h-3.5" />
-                            <span>+ Entrada</span>
-                          </button>
+                          {canAccessModule('entradas') && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenQuickOp(caja, 'ENTRADA')}
+                              className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold text-xs flex items-center space-x-1 transition shadow-2xs"
+                              title="Apuntar Entrada / Depósito por transferencia"
+                            >
+                              <ArrowDownRight className="w-3.5 h-3.5" />
+                              <span>+ Entrada</span>
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleOpenQuickOp(caja, 'SALIDA')}

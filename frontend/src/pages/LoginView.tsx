@@ -26,12 +26,6 @@ export const LoginView: React.FC = () => {
     }
   };
 
-  const setDemoCredentials = (u: string, p: string) => {
-    setUserName(u);
-    setPassword(p);
-    setError(null);
-  };
-
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
@@ -99,36 +93,6 @@ export const LoginView: React.FC = () => {
             <span>{loading ? 'Validando...' : 'Iniciar Sesión'}</span>
             <ArrowRight className="w-4 h-4 text-amber-400" />
           </button>
-
-          {/* Quick Login Chips for Ease of Access */}
-          <div className="pt-4 border-t border-slate-200">
-            <p className="text-xs text-slate-500 text-center mb-2.5 font-medium">
-              Cuentas configuradas de acceso rápido:
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setDemoCredentials('admin', 'Admin123!')}
-                className="py-1.5 px-2 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded text-xs text-amber-900 font-medium transition"
-              >
-                Admin
-              </button>
-              <button
-                type="button"
-                onClick={() => setDemoCredentials('tesorero', 'Tesorero123!')}
-                className="py-1.5 px-2 bg-blue-50 hover:bg-blue-100 border border-blue-300 rounded text-xs text-blue-900 font-medium transition"
-              >
-                Tesorero
-              </button>
-              <button
-                type="button"
-                onClick={() => setDemoCredentials('consulta', 'Consulta123!')}
-                className="py-1.5 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded text-xs text-slate-800 font-medium transition"
-              >
-                Consulta
-              </button>
-            </div>
-          </div>
         </form>
       </div>
     </div>

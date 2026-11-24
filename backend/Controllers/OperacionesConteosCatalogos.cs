@@ -57,10 +57,12 @@ public class ConteosController : ControllerBase
 public class OperacionesController : ControllerBase
 {
     private readonly ITesoreriaService _tesoreriaService;
+    private readonly IAuthService _authService;
 
-    public OperacionesController(ITesoreriaService tesoreriaService)
+    public OperacionesController(ITesoreriaService tesoreriaService, IAuthService authService)
     {
         _tesoreriaService = tesoreriaService;
+        _authService = authService;
     }
 
     [HttpGet]
@@ -76,13 +78,18 @@ public class OperacionesController : ControllerBase
     }
 
     [HttpPost("entrada")]
-    [Authorize(Roles = "Administrador,Tesorero")]
+    [Authorize]
     public async Task<IActionResult> RegistrarEntrada([FromBody] EntradaRequest request)
     {
         try
         {
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "1");
             var userName = User.Identity?.Name ?? "Usuario";
+            if (!await _authService.HasPermissionAsync(userName, "entradas"))
+            {
+                return StatusCode(403, new { message = "No tienes permiso para realizar entradas en Tesorería." });
+            }
+
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "1");
             var op = await _tesoreriaService.RegistrarEntradaAsync(request, userId, userName);
             return Ok(op);
         }

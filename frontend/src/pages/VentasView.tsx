@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { VentaResumen, VentaDetalle, VentaProducto, Pedido, Caja } from '../types';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 interface VentasViewProps {
   cajas: Caja[];
@@ -33,6 +34,7 @@ interface VentasViewProps {
 }
 
 export const VentasView: React.FC<VentasViewProps> = ({ cajas, onEntradaRealizada }) => {
+  const { canAccessModule } = useAuth();
   const [ventas, setVentas] = useState<VentaResumen[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedVentaId, setSelectedVentaId] = useState<number | null>(null);
@@ -605,13 +607,15 @@ export const VentasView: React.FC<VentasViewProps> = ({ cajas, onEntradaRealizad
                     <span>Nuevo Pedido</span>
                   </button>
 
-                  <button
-                    onClick={handleOpenRealizarEntrada}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Realizar Entrada</span>
-                  </button>
+                  {canAccessModule('entradas') && (
+                    <button
+                      onClick={handleOpenRealizarEntrada}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Realizar Entrada</span>
+                    </button>
+                  )}
                 </>
               )}
 

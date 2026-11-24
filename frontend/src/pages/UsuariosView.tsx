@@ -28,6 +28,7 @@ const MODULOS_DISPONIBLES = [
   { id: 'operaciones', nombre: 'Movimientos por Caja', descripcion: 'Entradas, salidas y transferencias' },
   { id: 'reportes', nombre: 'Reportes y Excel', descripcion: 'Auditorías y exportación de archivos Excel' },
   { id: 'usuarios', nombre: 'Usuarios y Permisos', descripcion: 'Gestión de usuarios y personalización de roles' },
+  { id: 'entradas', nombre: 'Realizar Entradas', descripcion: 'Permiso para realizar y registrar entradas de dinero a cajas y desde Ventas' },
 ];
 
 export const UsuariosView: React.FC = () => {

@@ -34,7 +34,7 @@ public static class DbInitializer
                     Nombre = "Administrador",
                     Descripcion = "Control total del sistema, administración de usuarios, roles, cajas, ventas y auditoría.",
                     EsSistema = true,
-                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"conteo\",\"operaciones\",\"ventas\",\"reportes\",\"usuarios\"]",
+                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"conteo\",\"operaciones\",\"ventas\",\"reportes\",\"usuarios\",\"entradas\"]",
                     FechaCreacion = DateTime.UtcNow
                 },
                 new()
@@ -42,7 +42,7 @@ public static class DbInitializer
                     Nombre = "Tesorero",
                     Descripcion = "Gestión de cajas, arqueos físicos de efectivo, entradas, salidas, ventas y transferencias.",
                     EsSistema = true,
-                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"conteo\",\"operaciones\",\"ventas\",\"reportes\"]",
+                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"conteo\",\"operaciones\",\"ventas\",\"reportes\",\"entradas\"]",
                     FechaCreacion = DateTime.UtcNow
                 },
                 new()
@@ -59,16 +59,26 @@ public static class DbInitializer
         }
         else
         {
-            // Asegurar que el módulo "ventas" esté habilitado en los roles base si no lo tenían
+            // Asegurar que los módulos "ventas" y "entradas" estén habilitados en los roles base si no los tenían
             var roles = await context.RolesPersonalizados.ToListAsync();
             foreach (var r in roles)
             {
                 try
                 {
                     var mods = System.Text.Json.JsonSerializer.Deserialize<List<string>>(r.ModulosPermitidosJson) ?? new();
+                    bool modified = false;
                     if (!mods.Contains("ventas"))
                     {
                         mods.Add("ventas");
+                        modified = true;
+                    }
+                    if ((r.Nombre == "Administrador" || r.Nombre == "Tesorero") && !mods.Contains("entradas"))
+                    {
+                        mods.Add("entradas");
+                        modified = true;
+                    }
+                    if (modified)
+                    {
                         r.ModulosPermitidosJson = System.Text.Json.JsonSerializer.Serialize(mods);
                     }
                 }

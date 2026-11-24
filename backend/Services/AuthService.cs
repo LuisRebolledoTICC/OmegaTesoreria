@@ -20,6 +20,7 @@ public interface IAuthService
     Task<RolPersonalizadoDto?> CreateRolAsync(CreateOrUpdateRolRequest request, string currentUserName);
     Task<bool> UpdateRolAsync(int id, CreateOrUpdateRolRequest request, string currentUserName);
     Task<bool> DeleteRolAsync(int id, string currentUserName);
+    Task<bool> HasPermissionAsync(string userName, string modulo);
 }
 
 public class AuthService : IAuthService
@@ -61,15 +62,15 @@ public class AuthService : IAuthService
             // Roles por defecto
             if (user.Rol == "Administrador")
             {
-                modulos = new List<string> { "dashboard", "cajas", "conteo", "operaciones", "reportes", "usuarios" };
+                modulos = new List<string> { "dashboard", "cajas", "conteo", "operaciones", "ventas", "reportes", "usuarios", "entradas" };
             }
             else if (user.Rol == "Tesorero")
             {
-                modulos = new List<string> { "dashboard", "cajas", "conteo", "operaciones", "reportes" };
+                modulos = new List<string> { "dashboard", "cajas", "conteo", "operaciones", "ventas", "reportes", "entradas" };
             }
             else
             {
-                modulos = new List<string> { "dashboard", "cajas", "operaciones", "reportes" };
+                modulos = new List<string> { "dashboard", "cajas", "ventas", "reportes" };
             }
         }
 
@@ -288,5 +289,30 @@ public class AuthService : IAuthService
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public async Task<bool> HasPermissionAsync(string userName, string modulo)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.UserName.ToLower() == userName.ToLower() && u.Activo);
+        if (user == null) return false;
+        if (user.Rol == "Administrador") return true;
+
+        var rol = await _context.RolesPersonalizados.FirstOrDefaultAsync(r => r.Nombre == user.Rol);
+        if (rol != null)
+        {
+            try
+            {
+                var modulos = System.Text.Json.JsonSerializer.Deserialize<List<string>>(rol.ModulosPermitidosJson) ?? new();
+                return modulos.Contains(modulo, StringComparer.OrdinalIgnoreCase);
+            }
+            catch { }
+        }
+
+        if (user.Rol == "Tesorero" && (modulo == "entradas" || modulo == "operaciones" || modulo == "conteo" || modulo == "ventas"))
+        {
+            return true;
+        }
+
+        return false;
     }
 }

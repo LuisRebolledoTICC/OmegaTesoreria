@@ -2,13 +2,9 @@ import React, { useState } from 'react';
 import {
   FileSpreadsheet,
   Download,
-  Calendar,
   Wallet,
-  Coins,
-  Package,
-  TrendingUp,
-  TrendingDown,
-  Printer
+  Printer,
+  AlertCircle
 } from 'lucide-react';
 import { Caja, DashboardSummary } from '../types';
 import { api } from '../services/api';
@@ -20,15 +16,21 @@ interface ReportesViewProps {
 
 export const ReportesView: React.FC<ReportesViewProps> = ({ summary, cajas }) => {
   const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const formatMoney = (val: number) =>
     new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val);
 
-  const handleDownloadExcel = () => {
+  const handleDownloadExcel = async () => {
     setDownloading(true);
-    const url = api.getExcelReportUrl();
-    window.open(url, '_blank');
-    setTimeout(() => setDownloading(false), 2000);
+    setError(null);
+    try {
+      await api.downloadExcelReport();
+    } catch (err: any) {
+      setError(err.message || 'Error al descargar el archivo Excel.');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const handlePrint = () => {
@@ -36,12 +38,12 @@ export const ReportesView: React.FC<ReportesViewProps> = ({ summary, cajas }) =>
   };
 
   return (
-    <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-6 print:space-y-4">
+      {/* Top Banner (oculto al imprimir) */}
+      <div className="print:hidden bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-800 flex items-center space-x-2">
-            <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+          <h2 className="text-lg sm:text-xl font-bold text-slate-800 flex items-center space-x-2">
+            <FileSpreadsheet className="w-5 h-5 text-emerald-600 shrink-0" />
             <span>Reportes Financieros y Exportación</span>
           </h2>
           <p className="text-xs text-slate-500">
@@ -49,18 +51,20 @@ export const ReportesView: React.FC<ReportesViewProps> = ({ summary, cajas }) =>
           </p>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
+            type="button"
             onClick={handlePrint}
-            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg text-xs flex items-center space-x-1.5 transition"
+            className="flex-1 sm:flex-none px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer"
           >
             <Printer className="w-4 h-4 text-slate-600" />
-            <span>Imprimir Vista</span>
+            <span>Imprimir Vista (PDF)</span>
           </button>
           <button
+            type="button"
             onClick={handleDownloadExcel}
             disabled={downloading}
-            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded-lg text-xs flex items-center space-x-2 transition shadow-xs"
+            className="flex-1 sm:flex-none px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded-lg text-xs flex items-center justify-center space-x-2 transition shadow-xs disabled:opacity-60 cursor-pointer"
           >
             <Download className="w-4 h-4" />
             <span>{downloading ? 'Generando...' : 'Descargar Excel (.xlsx)'}</span>
@@ -68,11 +72,18 @@ export const ReportesView: React.FC<ReportesViewProps> = ({ summary, cajas }) =>
         </div>
       </div>
 
+      {error && (
+        <div className="print:hidden p-3.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center space-x-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
       {/* Reporte Consolidado Impreso / Visible */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-6">
+      <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs space-y-6 print:border-none print:shadow-none print:p-0">
         <div className="border-b border-slate-200 pb-4 text-center">
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">GRUPO APOSTÓLICO OMEGA</h1>
-          <h2 className="text-sm font-bold uppercase tracking-widest text-amber-600 mt-0.5">
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">GRUPO APOSTÓLICO OMEGA</h1>
+          <h2 className="text-xs sm:text-sm font-bold uppercase tracking-widest text-amber-600 mt-0.5">
             Estado de Posición Financiera y Arqueo de Tesorería
           </h2>
           <p className="text-xs text-slate-500 mt-1">
@@ -81,7 +92,7 @@ export const ReportesView: React.FC<ReportesViewProps> = ({ summary, cajas }) =>
         </div>
 
         {/* Resumen Global */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 print:grid-cols-3 gap-4 print:gap-3">
           <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center">
             <span className="text-xs text-slate-500 uppercase font-semibold">Patrimonio Total</span>
             <p className="text-2xl font-extrabold text-slate-900 mt-1">{formatMoney(summary?.saldoTotal || 0)}</p>
@@ -185,7 +196,7 @@ export const ReportesView: React.FC<ReportesViewProps> = ({ summary, cajas }) =>
         </div>
 
         {/* Firmas de Responsabilidad */}
-        <div className="pt-12 grid grid-cols-2 gap-8 text-center text-xs text-slate-600">
+        <div className="pt-12 grid grid-cols-2 gap-8 text-center text-xs text-slate-600 print-avoid-break">
           <div className="border-t border-slate-400 pt-2">
             <p className="font-bold text-slate-800">Tesorero Responsable</p>
             <p className="text-[11px] text-slate-500">Grupo Apostólico Omega</p>

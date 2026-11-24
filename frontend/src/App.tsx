@@ -117,7 +117,7 @@ const MainLayout: React.FC = () => {
   const currentTab = (activeTab && canAccessModule(activeTab) ? activeTab : firstAvailableTab) as ActiveTab;
 
   return (
-    <div className="flex h-dvh w-full overflow-hidden bg-slate-50 font-sans">
+    <div className="flex h-dvh w-full overflow-hidden bg-slate-50 font-sans print:h-auto print:overflow-visible print:bg-white">
       {/* Sidebar fija en desktop/tablet y drawer en móvil */}
       <Sidebar
         activeTab={currentTab}
@@ -132,7 +132,7 @@ const MainLayout: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 h-dvh overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 h-dvh overflow-hidden print:h-auto print:overflow-visible">
         <Navbar
           title={titles[currentTab]}
           onRefresh={loadData}
@@ -140,7 +140,7 @@ const MainLayout: React.FC = () => {
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
         />
 
-        <main className="flex-1 p-3 sm:p-5 md:p-6 overflow-y-auto w-full max-w-7xl mx-auto">
+        <main className="flex-1 p-3 sm:p-5 md:p-6 overflow-y-auto w-full max-w-7xl mx-auto print:p-0 print:overflow-visible print:max-w-none">
           {currentTab === 'dashboard' && canAccessModule('dashboard') && (
             <DashboardView
               summary={summary}

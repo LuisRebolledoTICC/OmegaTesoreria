@@ -24,7 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   });
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 px-3 sm:px-6 flex items-center justify-between gap-2 shrink-0 shadow-xs">
+    <header className="h-16 bg-white border-b border-slate-200 px-3 sm:px-6 flex items-center justify-between gap-2 shrink-0 shadow-xs print:hidden">
       <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0 flex-1">
         {onOpenMobileMenu && (
           <button

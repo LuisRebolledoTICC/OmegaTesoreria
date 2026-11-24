@@ -341,8 +341,41 @@ export const api = {
     return `${API_BASE_URL}/respaldos/descargar/${encodeURIComponent(nombreArchivo)}`;
   },
 
-  getExcelReportUrl(): string {
-    return `${API_BASE_URL}/reportes/excel/general`;
+  async downloadExcelReport(): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/reportes/excel/general`, {
+      method: 'GET',
+      headers: getHeaders(false),
+    });
+
+    if (!res.ok) {
+      let errorMsg = 'No se pudo generar el reporte en Excel.';
+      try {
+        const err = await res.json();
+        errorMsg = err.message || errorMsg;
+      } catch {
+        errorMsg = `Error ${res.status}: ${res.statusText}`;
+      }
+      throw new Error(errorMsg);
+    }
+
+    const blob = await res.blob();
+    const contentDisposition = res.headers.get('Content-Disposition');
+    let filename = `Omega_Tesoreria_General_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`;
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (match && match[1]) {
+        filename = match[1].replace(/['"]/g, '');
+      }
+    }
+
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(downloadUrl);
   },
 
   // Ventas

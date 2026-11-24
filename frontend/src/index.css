@@ -12,3 +12,28 @@ body {
   color: #0f172a;
   min-height: 100vh;
 }
+
+@media print {
+  @page {
+    size: letter portrait;
+    margin: 12mm;
+  }
+
+  html,
+  body,
+  #root {
+    height: auto !important;
+    overflow: visible !important;
+    background-color: #ffffff !important;
+  }
+
+  tr,
+  .print-avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+}

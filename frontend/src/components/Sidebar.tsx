@@ -90,7 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <>
       {/* Desktop & Tablet Sidebar (md y superior) */}
       <aside
-        className={`hidden md:flex flex-col h-dvh shrink-0 bg-slate-900 text-slate-200 border-r border-slate-800 transition-all duration-300 ease-in-out select-none ${
+        className={`hidden md:flex print:hidden flex-col h-dvh shrink-0 bg-slate-900 text-slate-200 border-r border-slate-800 transition-all duration-300 ease-in-out select-none ${
           isCollapsed ? 'w-20' : 'w-64'
         }`}
       >
@@ -247,7 +247,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Mobile Slide-Over Drawer (< md) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-slate-900 text-slate-200 flex flex-col h-dvh border-r border-slate-800 shadow-2xl transform transition-transform duration-300 ease-in-out md:hidden select-none ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-slate-900 text-slate-200 flex flex-col h-dvh border-r border-slate-800 shadow-2xl transform transition-transform duration-300 ease-in-out md:hidden print:hidden select-none ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

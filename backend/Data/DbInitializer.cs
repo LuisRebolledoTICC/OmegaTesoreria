@@ -24,6 +24,40 @@ public static class DbInitializer
             await context.Database.MigrateAsync();
         }
 
+        // 0. Seed Roles Personalizados Base (Administrador, Tesorero, Consulta)
+        if (!await context.RolesPersonalizados.AnyAsync())
+        {
+            var rolesBase = new List<RolPersonalizado>
+            {
+                new()
+                {
+                    Nombre = "Administrador",
+                    Descripcion = "Control total del sistema, administración de usuarios, roles, cajas y auditoría.",
+                    EsSistema = true,
+                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"conteo\",\"operaciones\",\"reportes\",\"usuarios\"]",
+                    FechaCreacion = DateTime.UtcNow
+                },
+                new()
+                {
+                    Nombre = "Tesorero",
+                    Descripcion = "Gestión de cajas, arqueos físicos de efectivo, entradas, salidas y transferencias.",
+                    EsSistema = true,
+                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"conteo\",\"operaciones\",\"reportes\"]",
+                    FechaCreacion = DateTime.UtcNow
+                },
+                new()
+                {
+                    Nombre = "Consulta",
+                    Descripcion = "Solo lectura de dashboard, saldos de cajas y reportes de tesorería.",
+                    EsSistema = true,
+                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"reportes\"]",
+                    FechaCreacion = DateTime.UtcNow
+                }
+            };
+            await context.RolesPersonalizados.AddRangeAsync(rolesBase);
+            await context.SaveChangesAsync();
+        }
+
         // Si no existe ninguna caja de transferencias, crearla automáticamente
         if (!await context.Cajas.AnyAsync(c => c.Tipo == "TRANSFERENCIAS"))
         {

@@ -1,5 +1,6 @@
 import {
   User,
+  RolPersonalizado,
   LoginResponse,
   Caja,
   Denominacion,
@@ -79,6 +80,38 @@ export const api = {
   async toggleUserStatus(id: number): Promise<void> {
     const res = await fetch(`${API_BASE_URL}/auth/users/${id}/toggle-status`, {
       method: 'PATCH',
+      headers: getHeaders(),
+    });
+    await handleResponse(res);
+  },
+
+  // Roles
+  async getRoles(): Promise<RolPersonalizado[]> {
+    const res = await fetch(`${API_BASE_URL}/auth/roles`, { headers: getHeaders() });
+    return handleResponse<RolPersonalizado[]>(res);
+  },
+
+  async createRol(data: { nombre: string; descripcion: string; modulosPermitidos: string[] }): Promise<RolPersonalizado> {
+    const res = await fetch(`${API_BASE_URL}/auth/roles`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<RolPersonalizado>(res);
+  },
+
+  async updateRol(id: number, data: { nombre: string; descripcion: string; modulosPermitidos: string[] }): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/auth/roles/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    await handleResponse(res);
+  },
+
+  async deleteRol(id: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/auth/roles/${id}`, {
+      method: 'DELETE',
       headers: getHeaders(),
     });
     await handleResponse(res);

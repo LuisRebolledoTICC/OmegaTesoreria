@@ -16,6 +16,10 @@ public interface IAuthService
     Task<UserDto?> CreateUserAsync(CreateUserRequest request, string currentUserName);
     Task<bool> UpdateUserAsync(int id, UpdateUserRequest request, string currentUserName);
     Task<bool> ToggleUserStatusAsync(int id, string currentUserName);
+    Task<List<RolPersonalizadoDto>> GetRolesAsync();
+    Task<RolPersonalizadoDto?> CreateRolAsync(CreateOrUpdateRolRequest request, string currentUserName);
+    Task<bool> UpdateRolAsync(int id, CreateOrUpdateRolRequest request, string currentUserName);
+    Task<bool> DeleteRolAsync(int id, string currentUserName);
 }
 
 public class AuthService : IAuthService
@@ -41,8 +45,36 @@ public class AuthService : IAuthService
         user.UltimoAcceso = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
+        // Obtener permisos/módulos según el rol
+        List<string> modulos = new();
+        var rolDb = await _context.RolesPersonalizados.FirstOrDefaultAsync(r => r.Nombre == user.Rol);
+        if (rolDb != null)
+        {
+            try
+            {
+                modulos = System.Text.Json.JsonSerializer.Deserialize<List<string>>(rolDb.ModulosPermitidosJson) ?? new();
+            }
+            catch { }
+        }
+        else
+        {
+            // Roles por defecto
+            if (user.Rol == "Administrador")
+            {
+                modulos = new List<string> { "dashboard", "cajas", "conteo", "operaciones", "reportes", "usuarios" };
+            }
+            else if (user.Rol == "Tesorero")
+            {
+                modulos = new List<string> { "dashboard", "cajas", "conteo", "operaciones", "reportes" };
+            }
+            else
+            {
+                modulos = new List<string> { "dashboard", "cajas", "operaciones", "reportes" };
+            }
+        }
+
         var token = GenerateJwtToken(user);
-        return new LoginResponse(token, user.UserName, user.Nombre, user.Rol);
+        return new LoginResponse(token, user.UserName, user.Nombre, user.Rol, modulos);
     }
 
     public async Task<List<UserDto>> GetUsersAsync()
@@ -124,6 +156,109 @@ public class AuthService : IAuthService
             EntidadId = user.Id.ToString(),
             FechaHora = DateTime.UtcNow,
             Descripcion = $"Cambio de estado de usuario {user.UserName} a {(user.Activo ? "Activo" : "Inactivo")}"
+        });
+
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<List<RolPersonalizadoDto>> GetRolesAsync()
+    {
+        var roles = await _context.RolesPersonalizados.OrderBy(r => r.Nombre).ToListAsync();
+        return roles.Select(r =>
+        {
+            List<string> mods;
+            try
+            {
+                mods = System.Text.Json.JsonSerializer.Deserialize<List<string>>(r.ModulosPermitidosJson) ?? new();
+            }
+            catch
+            {
+                mods = new();
+            }
+            return new RolPersonalizadoDto(r.Id, r.Nombre, r.Descripcion, r.EsSistema, mods);
+        }).ToList();
+    }
+
+    public async Task<RolPersonalizadoDto?> CreateRolAsync(CreateOrUpdateRolRequest request, string currentUserName)
+    {
+        if (await _context.RolesPersonalizados.AnyAsync(r => r.Nombre.ToLower() == request.Nombre.Trim().ToLower()))
+        {
+            return null;
+        }
+
+        var jsonMods = System.Text.Json.JsonSerializer.Serialize(request.ModulosPermitidos ?? new());
+        var rol = new RolPersonalizado
+        {
+            Nombre = request.Nombre.Trim(),
+            Descripcion = request.Descripcion.Trim(),
+            EsSistema = false,
+            ModulosPermitidosJson = jsonMods,
+            FechaCreacion = DateTime.UtcNow
+        };
+
+        _context.RolesPersonalizados.Add(rol);
+        _context.Auditoria.Add(new Auditoria
+        {
+            UsuarioNombre = currentUserName,
+            Accion = "CREAR_ROL",
+            Entidad = "RolPersonalizado",
+            EntidadId = rol.Nombre,
+            FechaHora = DateTime.UtcNow,
+            Descripcion = $"Creación de rol personalizado '{rol.Nombre}'"
+        });
+
+        await _context.SaveChangesAsync();
+        return new RolPersonalizadoDto(rol.Id, rol.Nombre, rol.Descripcion, rol.EsSistema, request.ModulosPermitidos ?? new());
+    }
+
+    public async Task<bool> UpdateRolAsync(int id, CreateOrUpdateRolRequest request, string currentUserName)
+    {
+        var rol = await _context.RolesPersonalizados.FindAsync(id);
+        if (rol == null) return false;
+
+        // Si es de sistema, no se permite cambiar el nombre para no romper roles base, pero sí sus módulos y descripción
+        if (!rol.EsSistema)
+        {
+            rol.Nombre = request.Nombre.Trim();
+        }
+        rol.Descripcion = request.Descripcion.Trim();
+        rol.ModulosPermitidosJson = System.Text.Json.JsonSerializer.Serialize(request.ModulosPermitidos ?? new());
+
+        _context.Auditoria.Add(new Auditoria
+        {
+            UsuarioNombre = currentUserName,
+            Accion = "ACTUALIZAR_ROL",
+            Entidad = "RolPersonalizado",
+            EntidadId = rol.Nombre,
+            FechaHora = DateTime.UtcNow,
+            Descripcion = $"Actualización de permisos y módulos del rol '{rol.Nombre}'"
+        });
+
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> DeleteRolAsync(int id, string currentUserName)
+    {
+        var rol = await _context.RolesPersonalizados.FindAsync(id);
+        if (rol == null || rol.EsSistema) return false;
+
+        // No borrar si hay usuarios asignados a este rol
+        if (await _context.Users.AnyAsync(u => u.Rol == rol.Nombre))
+        {
+            return false;
+        }
+
+        _context.RolesPersonalizados.Remove(rol);
+        _context.Auditoria.Add(new Auditoria
+        {
+            UsuarioNombre = currentUserName,
+            Accion = "ELIMINAR_ROL",
+            Entidad = "RolPersonalizado",
+            EntidadId = rol.Nombre,
+            FechaHora = DateTime.UtcNow,
+            Descripcion = $"Eliminación del rol '{rol.Nombre}'"
         });
 
         await _context.SaveChangesAsync();

@@ -4,7 +4,8 @@ import { api } from '../services/api';
 interface AuthUser {
   userName: string;
   nombre: string;
-  rol: 'Administrador' | 'Tesorero' | 'Consulta';
+  rol: string;
+  modulosPermitidos?: string[];
 }
 
 interface AuthContextType {
@@ -15,6 +16,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isTesorero: boolean;
   canOperate: boolean;
+  canAccessModule: (modulo: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -35,6 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       userName: res.userName,
       nombre: res.nombre,
       rol: res.rol,
+      modulosPermitidos: res.modulosPermitidos,
     };
     setUser(authUser);
     setToken(res.token);
@@ -51,10 +54,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const isAdmin = user?.rol === 'Administrador';
   const isTesorero = user?.rol === 'Tesorero' || isAdmin;
-  const canOperate = isAdmin || user?.rol === 'Tesorero';
+  const canOperate = isAdmin || user?.rol === 'Tesorero' || (user?.modulosPermitidos?.includes('conteo') ?? false);
+
+  const canAccessModule = (modulo: string): boolean => {
+    if (!user) return false;
+    if (user.rol === 'Administrador') return true;
+    if (user.modulosPermitidos && user.modulosPermitidos.length > 0) {
+      return user.modulosPermitidos.includes(modulo);
+    }
+    // Fallback por defecto si no vienen modulos explícitos
+    if (modulo === 'dashboard' || modulo === 'cajas' || modulo === 'reportes') return true;
+    if (modulo === 'conteo' || modulo === 'operaciones') return isTesorero;
+    if (modulo === 'usuarios') return isAdmin;
+    return false;
+  };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAdmin, isTesorero, canOperate }}>
+    <AuthContext.Provider value={{ user, token, login, logout, isAdmin, isTesorero, canOperate, canAccessModule }}>
       {children}
     </AuthContext.Provider>
   );

@@ -12,6 +12,16 @@ public class User
     public DateTime? UltimoAcceso { get; set; }
 }
 
+public class RolPersonalizado
+{
+    public int Id { get; set; }
+    public string Nombre { get; set; } = string.Empty;
+    public string Descripcion { get; set; } = string.Empty;
+    public bool EsSistema { get; set; } = false; // Administrador, Tesorero, Consulta son del sistema
+    public string ModulosPermitidosJson { get; set; } = "[]"; // Array de IDs de módulos: ["dashboard","cajas","conteo","operaciones","reportes","usuarios"]
+    public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
+}
+
 public class Caja
 {
     public int Id { get; set; }

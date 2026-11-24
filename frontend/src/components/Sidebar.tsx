@@ -19,8 +19,7 @@ export type ActiveTab =
   | 'conteo'
   | 'operaciones'
   | 'reportes'
-  | 'usuarios'
-  | 'respaldos';
+  | 'usuarios';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -29,16 +28,15 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
-  const { user, logout, isAdmin, canOperate } = useAuth();
+  const { user, logout, canAccessModule } = useAuth();
 
   const navItems = [
-    { id: 'dashboard' as ActiveTab, label: 'Dashboard', icon: LayoutDashboard, show: true },
-    { id: 'cajas' as ActiveTab, label: 'Cajas de Tesorería', icon: Wallet, show: true },
-    { id: 'conteo' as ActiveTab, label: 'Conteo de Efectivo', icon: Calculator, show: canOperate },
-    { id: 'operaciones' as ActiveTab, label: 'Movimientos por Caja', icon: ArrowLeftRight, show: true },
-    { id: 'reportes' as ActiveTab, label: 'Reportes y Excel', icon: FileSpreadsheet, show: true },
-    { id: 'usuarios' as ActiveTab, label: 'Usuarios y Roles', icon: Users, show: isAdmin },
-    { id: 'respaldos' as ActiveTab, label: 'Respaldos y BD', icon: Database, show: isAdmin },
+    { id: 'dashboard' as ActiveTab, label: 'Dashboard', icon: LayoutDashboard, show: canAccessModule('dashboard') },
+    { id: 'cajas' as ActiveTab, label: 'Cajas de Tesorería', icon: Wallet, show: canAccessModule('cajas') },
+    { id: 'conteo' as ActiveTab, label: 'Conteo de Efectivo', icon: Calculator, show: canAccessModule('conteo') },
+    { id: 'operaciones' as ActiveTab, label: 'Movimientos por Caja', icon: ArrowLeftRight, show: canAccessModule('operaciones') },
+    { id: 'reportes' as ActiveTab, label: 'Reportes y Excel', icon: FileSpreadsheet, show: canAccessModule('reportes') },
+    { id: 'usuarios' as ActiveTab, label: 'Usuarios y Permisos', icon: Users, show: canAccessModule('usuarios') },
   ];
 
   return (

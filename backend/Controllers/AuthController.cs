@@ -66,4 +66,47 @@ public class AuthController : ControllerBase
         if (!success) return NotFound();
         return Ok(new { message = "Estado actualizado." });
     }
+
+    [HttpGet("roles")]
+    [Authorize]
+    public async Task<IActionResult> GetRoles()
+    {
+        var roles = await _authService.GetRolesAsync();
+        return Ok(roles);
+    }
+
+    [HttpPost("roles")]
+    [Authorize(Roles = "Administrador")]
+    public async Task<IActionResult> CreateRol([FromBody] CreateOrUpdateRolRequest request)
+    {
+        var currentUser = User.Identity?.Name ?? "Sistema";
+        var rol = await _authService.CreateRolAsync(request, currentUser);
+        if (rol == null)
+            return BadRequest(new { message = "Ya existe un rol con ese nombre." });
+
+        return Ok(rol);
+    }
+
+    [HttpPut("roles/{id}")]
+    [Authorize(Roles = "Administrador")]
+    public async Task<IActionResult> UpdateRol(int id, [FromBody] CreateOrUpdateRolRequest request)
+    {
+        var currentUser = User.Identity?.Name ?? "Sistema";
+        var success = await _authService.UpdateRolAsync(id, request, currentUser);
+        if (!success) return NotFound();
+
+        return Ok(new { message = "Rol actualizado exitosamente." });
+    }
+
+    [HttpDelete("roles/{id}")]
+    [Authorize(Roles = "Administrador")]
+    public async Task<IActionResult> DeleteRol(int id)
+    {
+        var currentUser = User.Identity?.Name ?? "Sistema";
+        var success = await _authService.DeleteRolAsync(id, currentUser);
+        if (!success)
+            return BadRequest(new { message = "No se puede eliminar un rol del sistema o que tenga usuarios asignados." });
+
+        return Ok(new { message = "Rol eliminado." });
+    }
 }

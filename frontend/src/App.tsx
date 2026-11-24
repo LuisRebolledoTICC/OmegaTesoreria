@@ -58,8 +58,7 @@ const MainLayout: React.FC = () => {
     conteo: 'Conteo Físico de Efectivo',
     operaciones: 'Movimientos por Cada Caja',
     reportes: 'Reportes y Exportación',
-    usuarios: 'Administración de Usuarios y Roles',
-    respaldos: 'Copias de Seguridad y Restauración',
+    usuarios: 'Administración de Usuarios y Permisos',
   };
 
   return (
@@ -120,8 +119,6 @@ const MainLayout: React.FC = () => {
           )}
 
           {activeTab === 'usuarios' && <UsuariosView />}
-
-          {activeTab === 'respaldos' && <RespaldosView />}
         </main>
       </div>
     </div>

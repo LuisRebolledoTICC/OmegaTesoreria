@@ -2,17 +2,26 @@ export interface User {
   id: number;
   userName: string;
   nombre: string;
-  rol: 'Administrador' | 'Tesorero' | 'Consulta';
+  rol: string;
   activo: boolean;
   fechaCreacion: string;
   ultimoAcceso?: string;
+}
+
+export interface RolPersonalizado {
+  id: number;
+  nombre: string;
+  descripcion: string;
+  esSistema: boolean;
+  modulosPermitidos: string[];
 }
 
 export interface LoginResponse {
   token: string;
   userName: string;
   nombre: string;
-  rol: 'Administrador' | 'Tesorero' | 'Consulta';
+  rol: string;
+  modulosPermitidos?: string[];
 }
 
 export interface CajaEfectivoItem {

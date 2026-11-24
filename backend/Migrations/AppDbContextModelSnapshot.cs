@@ -382,6 +382,37 @@ namespace backend.Migrations
                     b.ToTable("Operaciones");
                 });
 
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.RolPersonalizado", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("EsSistema")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ModulosPermitidosJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("RolesPersonalizados");
+                });
+
             modelBuilder.Entity("OmegaTesoreria.Api.Models.TipoBolsa", b =>
                 {
                     b.Property<int>("Id")

@@ -19,6 +19,7 @@ public class AppDbContext : DbContext, IDataProtectionKeyContext
     public DbSet<DetalleOperacion> DetalleOperaciones => Set<DetalleOperacion>();
     public DbSet<Conteo> Conteos => Set<Conteo>();
     public DbSet<Auditoria> Auditoria => Set<Auditoria>();
+    public DbSet<RolPersonalizado> RolesPersonalizados => Set<RolPersonalizado>();
 
     // Persistencia de claves criptográficas de ASP.NET Core Data Protection
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();

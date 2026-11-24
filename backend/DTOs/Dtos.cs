@@ -1,11 +1,14 @@
 namespace OmegaTesoreria.Api.DTOs;
 
 public record LoginRequest(string UserName, string Password);
-public record LoginResponse(string Token, string UserName, string Nombre, string Rol);
+public record LoginResponse(string Token, string UserName, string Nombre, string Rol, List<string>? ModulosPermitidos = null);
 
 public record UserDto(int Id, string UserName, string Nombre, string Rol, bool Activo, DateTime FechaCreacion, DateTime? UltimoAcceso);
 public record CreateUserRequest(string UserName, string Password, string Nombre, string Rol);
 public record UpdateUserRequest(string Nombre, string Rol, bool Activo, string? NewPassword);
+
+public record RolPersonalizadoDto(int Id, string Nombre, string Descripcion, bool EsSistema, List<string> ModulosPermitidos);
+public record CreateOrUpdateRolRequest(string Nombre, string Descripcion, List<string> ModulosPermitidos);
 
 public record CajaDto(
     int Id,

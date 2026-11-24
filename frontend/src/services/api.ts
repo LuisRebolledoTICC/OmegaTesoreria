@@ -422,6 +422,25 @@ export const api = {
     return handleResponse<Pedido>(res);
   },
 
+  async updatePedido(
+    ventaId: number,
+    pedidoId: number,
+    data: {
+      nombreCliente?: string;
+      observaciones?: string;
+      estadoEntrega: string;
+      items: { ventaPresentacionId: number; cantidad: number }[];
+      pagos: { metodoPago: string; importe: number; referencia?: string }[];
+    }
+  ): Promise<Pedido> {
+    const res = await fetch(`${API_BASE_URL}/ventas/${ventaId}/pedidos/${pedidoId}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<Pedido>(res);
+  },
+
   async updateEstadoEntrega(ventaId: number, pedidoId: number, estadoEntrega: string): Promise<void> {
     const res = await fetch(`${API_BASE_URL}/ventas/${ventaId}/pedidos/${pedidoId}/estado-entrega`, {
       method: 'PATCH',

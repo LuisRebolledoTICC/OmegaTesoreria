@@ -129,6 +129,20 @@ public class VentasController : ControllerBase
         }
     }
 
+    [HttpPut("{id}/pedidos/{pedidoId}")]
+    public async Task<IActionResult> UpdatePedido(int id, int pedidoId, [FromBody] CreatePedidoRequest request)
+    {
+        try
+        {
+            var pedido = await _ventasService.UpdatePedidoAsync(id, pedidoId, request, GetCurrentUserName());
+            return Ok(pedido);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpPatch("{id}/pedidos/{pedidoId}/estado-entrega")]
     public async Task<IActionResult> UpdateEstadoEntrega(int id, int pedidoId, [FromBody] UpdateEstadoEntregaRequest request)
     {

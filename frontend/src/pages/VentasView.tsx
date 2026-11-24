@@ -24,7 +24,7 @@ import {
   ChevronRight,
   AlertCircle
 } from 'lucide-react';
-import { VentaResumen, VentaDetalle, VentaProducto, Caja } from '../types';
+import { VentaResumen, VentaDetalle, VentaProducto, Pedido, Caja } from '../types';
 import { api } from '../services/api';
 
 interface VentasViewProps {
@@ -57,8 +57,10 @@ export const VentasView: React.FC<VentasViewProps> = ({ cajas, onEntradaRealizad
   const [guardandoProd, setGuardandoProd] = useState(false);
   const [prodError, setProdError] = useState<string | null>(null);
 
-  // Modal: Nuevo Pedido
+  // Modal: Nuevo / Editar Pedido
   const [showPedidoModal, setShowPedidoModal] = useState(false);
+  const [pedidoEditId, setPedidoEditId] = useState<number | null>(null);
+  const [pedidoEditFolio, setPedidoEditFolio] = useState<number | null>(null);
   const [clienteNombre, setClienteNombre] = useState('');
   const [pedidoObs, setPedidoObs] = useState('');
   const [estadoEntregaInicial, setEstadoEntregaInicial] = useState('PENDIENTE');
@@ -235,6 +237,8 @@ export const VentasView: React.FC<VentasViewProps> = ({ cajas, onEntradaRealizad
       alert('Primero debes agregar al menos un producto a la venta.');
       return;
     }
+    setPedidoEditId(null);
+    setPedidoEditFolio(null);
     setClienteNombre('');
     setPedidoObs('');
     setEstadoEntregaInicial('PENDIENTE');
@@ -242,6 +246,27 @@ export const VentasView: React.FC<VentasViewProps> = ({ cajas, onEntradaRealizad
     setPagoEfectivo(0);
     setPagoTransferencia(0);
     setPagoPendiente(false);
+    setPedidoError(null);
+    setShowPedidoModal(true);
+  };
+
+  const handleOpenEditarPedido = (ped: Pedido) => {
+    setPedidoEditId(ped.id);
+    setPedidoEditFolio(ped.folio);
+    setClienteNombre(ped.nombreCliente || '');
+    setPedidoObs(ped.observaciones || '');
+    setEstadoEntregaInicial(ped.estadoEntrega);
+    setCartItems(
+      ped.detalles.map((d) => ({
+        ventaPresentacionId: d.ventaPresentacionId || 0,
+        cantidad: d.cantidad,
+      }))
+    );
+    const ef = ped.pagos.find((p) => p.metodoPago === 'EFECTIVO');
+    const tr = ped.pagos.find((p) => p.metodoPago === 'TRANSFERENCIA');
+    setPagoEfectivo(ef ? ef.importe : 0);
+    setPagoTransferencia(tr ? tr.importe : 0);
+    setPagoPendiente(ped.estadoPago === 'PENDIENTE' || (!ef && !tr));
     setPedidoError(null);
     setShowPedidoModal(true);
   };
@@ -334,18 +359,30 @@ export const VentasView: React.FC<VentasViewProps> = ({ cajas, onEntradaRealizad
     setGuardandoPedido(true);
     setPedidoError(null);
     try {
-      await api.createPedido(selectedVentaId, {
-        nombreCliente: clienteNombre.trim(),
-        observaciones: pedidoObs.trim(),
-        estadoEntrega: estadoEntregaInicial,
-        items: cartItems,
-        pagos: pagosList,
-      });
+      if (pedidoEditId) {
+        await api.updatePedido(selectedVentaId, pedidoEditId, {
+          nombreCliente: clienteNombre.trim(),
+          observaciones: pedidoObs.trim(),
+          estadoEntrega: estadoEntregaInicial,
+          items: cartItems,
+          pagos: pagosList,
+        });
+      } else {
+        await api.createPedido(selectedVentaId, {
+          nombreCliente: clienteNombre.trim(),
+          observaciones: pedidoObs.trim(),
+          estadoEntrega: estadoEntregaInicial,
+          items: cartItems,
+          pagos: pagosList,
+        });
+      }
       setShowPedidoModal(false);
+      setPedidoEditId(null);
+      setPedidoEditFolio(null);
       loadVentaDetalle(selectedVentaId);
       loadVentas();
     } catch (err: any) {
-      setPedidoError(err.message || 'Error al registrar pedido.');
+      setPedidoError(err.message || 'Error al guardar pedido.');
     } finally {
       setGuardandoPedido(false);
     }
@@ -795,13 +832,22 @@ export const VentasView: React.FC<VentasViewProps> = ({ cajas, onEntradaRealizad
                         </td>
                         <td className="p-3 text-center">
                           {ventaDetalle.estado === 'ABIERTA' && ped.estadoEntrega !== 'CANCELADO' && (
-                            <button
-                              onClick={() => handleCancelarPedido(ped.id, ped.folio)}
-                              className="p-1 text-rose-600 hover:bg-rose-50 rounded transition"
-                              title="Cancelar Pedido"
-                            >
-                              <Ban className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center justify-center space-x-1">
+                              <button
+                                onClick={() => handleOpenEditarPedido(ped)}
+                                className="p-1.5 text-slate-600 hover:text-amber-600 hover:bg-slate-100 rounded-lg transition"
+                                title="Editar Pedido"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleCancelarPedido(ped.id, ped.folio)}
+                                className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                                title="Cancelar Pedido"
+                              >
+                                <Ban className="w-4 h-4" />
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -998,8 +1044,14 @@ export const VentasView: React.FC<VentasViewProps> = ({ cajas, onEntradaRealizad
       {showPedidoModal && ventaDetalle && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-base font-bold text-slate-900 mb-1">Registrar Nuevo Pedido</h3>
-            <p className="text-xs text-slate-500 mb-4">Selecciona los productos y registra el cobro correspondiente.</p>
+            <h3 className="text-base font-bold text-slate-900 mb-1">
+              {pedidoEditId ? `Editar Pedido #${pedidoEditFolio}` : 'Registrar Nuevo Pedido'}
+            </h3>
+            <p className="text-xs text-slate-500 mb-4">
+              {pedidoEditId
+                ? 'Modifica los productos, cantidades, entrega o pagos del pedido.'
+                : 'Selecciona los productos y registra el cobro correspondiente.'}
+            </p>
 
             {pedidoError && (
               <div className="p-3 mb-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center space-x-2">
@@ -1183,7 +1235,7 @@ export const VentasView: React.FC<VentasViewProps> = ({ cajas, onEntradaRealizad
                   disabled={guardandoPedido}
                   className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-bold shadow-xs transition"
                 >
-                  {guardandoPedido ? 'Guardando...' : 'Guardar Pedido'}
+                  {guardandoPedido ? 'Guardando...' : (pedidoEditId ? 'Guardar Cambios' : 'Guardar Pedido')}
                 </button>
               </div>
             </form>

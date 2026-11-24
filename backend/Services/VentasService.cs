@@ -20,6 +20,7 @@ public interface IVentasService
 
     // Pedidos
     Task<PedidoDto> CreatePedidoAsync(int ventaId, CreatePedidoRequest request, string userName);
+    Task<PedidoDto> UpdatePedidoAsync(int ventaId, int pedidoId, CreatePedidoRequest request, string userName);
     Task<bool> UpdateEstadoEntregaAsync(int ventaId, int pedidoId, UpdateEstadoEntregaRequest request, string userName);
     Task<bool> CancelarPedidoAsync(int ventaId, int pedidoId, string userName);
 
@@ -376,6 +377,140 @@ public class VentasService : IVentasService
         };
 
         _context.Pedidos.Add(pedido);
+        await _context.SaveChangesAsync();
+
+        return new PedidoDto(
+            pedido.Id,
+            pedido.VentaId,
+            pedido.Folio,
+            pedido.NombreCliente,
+            pedido.FechaHora,
+            pedido.TotalPedido,
+            pedido.EstadoEntrega,
+            pedido.EstadoPago,
+            pedido.Observaciones,
+            pedido.RegistradoPor,
+            pedido.Detalles.Select(d => new PedidoDetalleDto(d.Id, d.PedidoId, d.VentaPresentacionId, d.ProductoNombre, d.PresentacionNombre, d.Cantidad, d.PrecioUnitario, d.Subtotal)).ToList(),
+            pedido.Pagos.Select(pg => new PedidoPagoDto(pg.Id, pg.PedidoId, pg.MetodoPago, pg.Importe, pg.Referencia, pg.FechaPago)).ToList()
+        );
+    }
+
+    public async Task<PedidoDto> UpdatePedidoAsync(int ventaId, int pedidoId, CreatePedidoRequest request, string userName)
+    {
+        var venta = await _context.Ventas.FindAsync(ventaId);
+        if (venta == null) throw new InvalidOperationException("Venta no encontrada.");
+        if (venta.Estado == "CERRADA") throw new InvalidOperationException("No se pueden modificar pedidos en una venta cerrada.");
+
+        var pedido = await _context.Pedidos
+            .Include(p => p.Detalles)
+            .Include(p => p.Pagos)
+            .FirstOrDefaultAsync(p => p.Id == pedidoId && p.VentaId == ventaId)
+            ?? throw new InvalidOperationException("Pedido no encontrado.");
+
+        if (pedido.EstadoEntrega == "CANCELADO")
+        {
+            throw new InvalidOperationException("No se puede editar un pedido cancelado.");
+        }
+
+        if (request.Items == null || !request.Items.Any())
+        {
+            throw new InvalidOperationException("El pedido debe contener al menos un producto.");
+        }
+
+        // Validar presentaciones
+        var presentacionIds = request.Items.Select(i => i.VentaPresentacionId).Distinct().ToList();
+        var presentaciones = await _context.VentaPresentaciones
+            .Include(p => p.VentaProducto)
+            .Where(p => presentacionIds.Contains(p.Id) && p.VentaProducto!.VentaId == ventaId)
+            .ToDictionaryAsync(p => p.Id);
+
+        if (presentaciones.Count != presentacionIds.Count)
+        {
+            throw new InvalidOperationException("Una o más presentaciones seleccionadas no pertenecen a esta venta.");
+        }
+
+        // Limpiar detalles anteriores y recrear
+        _context.PedidoDetalles.RemoveRange(pedido.Detalles);
+        pedido.Detalles.Clear();
+
+        decimal totalCalculado = 0;
+        foreach (var item in request.Items)
+        {
+            if (item.Cantidad <= 0) continue;
+            var pres = presentaciones[item.VentaPresentacionId];
+            var subtotal = item.Cantidad * pres.Precio;
+            totalCalculado += subtotal;
+
+            pedido.Detalles.Add(new PedidoDetalle
+            {
+                PedidoId = pedido.Id,
+                VentaPresentacionId = pres.Id,
+                ProductoNombre = pres.VentaProducto?.Nombre ?? "Producto",
+                PresentacionNombre = pres.Nombre,
+                Cantidad = item.Cantidad,
+                PrecioUnitario = pres.Precio,
+                Subtotal = subtotal
+            });
+        }
+
+        pedido.TotalPedido = totalCalculado;
+
+        // Limpiar pagos anteriores y recrear
+        _context.PedidoPagos.RemoveRange(pedido.Pagos);
+        pedido.Pagos.Clear();
+
+        decimal totalPagado = 0;
+        if (request.Pagos != null && request.Pagos.Any())
+        {
+            foreach (var pago in request.Pagos)
+            {
+                if (pago.Importe <= 0 && pago.MetodoPago != "PENDIENTE") continue;
+                totalPagado += pago.Importe;
+
+                pedido.Pagos.Add(new PedidoPago
+                {
+                    PedidoId = pedido.Id,
+                    MetodoPago = pago.MetodoPago.ToUpperInvariant(),
+                    Importe = pago.Importe,
+                    Referencia = pago.Referencia,
+                    FechaPago = DateTime.UtcNow
+                });
+            }
+        }
+
+        if (totalPagado > totalCalculado)
+        {
+            throw new InvalidOperationException($"El total pagado (${totalPagado:N2}) no puede exceder el total del pedido (${totalCalculado:N2}).");
+        }
+
+        string estadoPago = "PENDIENTE";
+        if (totalPagado >= totalCalculado && totalCalculado > 0)
+        {
+            estadoPago = "PAGADO";
+        }
+        else if (totalPagado > 0)
+        {
+            estadoPago = "PARCIAL";
+        }
+
+        pedido.NombreCliente = request.NombreCliente?.Trim();
+        pedido.Observaciones = request.Observaciones?.Trim();
+        if (!string.IsNullOrWhiteSpace(request.EstadoEntrega))
+        {
+            pedido.EstadoEntrega = request.EstadoEntrega.ToUpperInvariant();
+        }
+        pedido.EstadoPago = estadoPago;
+
+        _context.Auditoria.Add(new Auditoria
+        {
+            UsuarioNombre = userName,
+            Accion = "EDITAR_PEDIDO",
+            Entidad = "Pedido",
+            EntidadId = pedido.Folio.ToString(),
+            FechaHora = DateTime.UtcNow,
+            Descripcion = $"Edición de pedido #{pedido.Folio} en la venta '{venta.Nombre}'. Nuevo total: ${pedido.TotalPedido:N2}"
+        });
+
         await _context.SaveChangesAsync();
 
         return new PedidoDto(

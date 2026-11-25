@@ -74,9 +74,9 @@ export const AreasView: React.FC = () => {
     }
   };
 
-  const loadUsuariosDisponibles = async (soloSinArea = false) => {
+  const loadUsuariosDisponibles = async (soloSinArea = false, soloOmega = false) => {
     try {
-      const data = await api.getUsuariosDisponiblesArea(soloSinArea);
+      const data = await api.getUsuariosDisponiblesArea(soloSinArea, soloOmega);
       setUsuariosDisponibles(data);
     } catch {
       // Usuario sin permisos para listar usuarios disponibles
@@ -179,18 +179,28 @@ export const AreasView: React.FC = () => {
     }
   };
 
+  const hasOmegaRole = (rol?: string | null): boolean => {
+    if (!rol) return false;
+    return rol
+      .split(/[,;|]/)
+      .map((r) => r.trim().toLowerCase())
+      .includes('omega');
+  };
+
   const handleOpenAddIntegrante = async () => {
     setIntegranteSearch('');
     setSelectedIntegranteIds([]);
     setIntegrantePage(1);
     setIntegranteError(null);
-    await loadUsuariosDisponibles(true);
+    await loadUsuariosDisponibles(true, true);
     setShowIntegranteModal(true);
   };
 
-  // Solo usuarios sin área asignada
+  // Solo usuarios con rol Omega y sin área asignada
   const availableUnassignedUsers = useMemo(() => {
-    return usuariosDisponibles.filter((u) => u.areaActualId === null || u.areaActualId === undefined);
+    return usuariosDisponibles.filter(
+      (u) => (u.areaActualId === null || u.areaActualId === undefined) && hasOmegaRole(u.rol)
+    );
   }, [usuariosDisponibles]);
 
   const filteredModalUsers = useMemo(() => {
@@ -615,7 +625,7 @@ export const AreasView: React.FC = () => {
                   Agregar Integrantes a {selectedArea.nombre}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Solo se muestran usuarios activos que aún no pertenecen a ningún área.
+                  Solo se muestran usuarios activos con rol <strong>Omega</strong> que aún no pertenecen a ningún área.
                 </p>
               </div>
               <button
@@ -685,7 +695,7 @@ export const AreasView: React.FC = () => {
                   <Users className="w-8 h-8 text-slate-300 mx-auto" />
                   <p className="text-sm font-semibold text-slate-700">No hay usuarios disponibles</p>
                   <p className="text-xs text-slate-500">
-                    Todos los usuarios activos ya pertenecen a un área. Para mover a alguien, primero retíralo de su área actual.
+                    Todos los usuarios activos con rol Omega ya pertenecen a un área, o no hay usuarios con rol Omega registrados sin área. Para mover a alguien, primero retíralo de su área actual.
                   </p>
                 </div>
               ) : filteredModalUsers.length === 0 ? (

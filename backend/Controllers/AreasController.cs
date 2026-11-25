@@ -27,6 +27,13 @@ public class AreasController : ControllerBase
     private int GetUserId() => int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
     private bool IsAdmin() => User.IsInRole("Administrador");
 
+    private static bool HasOmegaRole(string? rol)
+    {
+        if (string.IsNullOrWhiteSpace(rol)) return false;
+        var parts = rol.Split(new[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return parts.Any(p => p.Equals("Omega", StringComparison.OrdinalIgnoreCase));
+    }
+
     // GET: api/areas
     [HttpGet]
     public async Task<IActionResult> GetAreas()
@@ -260,10 +267,14 @@ public class AreasController : ControllerBase
         }
         if (!canManage) return Forbid();
 
-        // Verificar que el usuario existe
+        // Verificar que el usuario existe y está activo
         var usuario = await _context.Users.FindAsync(request.UsuarioId);
         if (usuario == null || !usuario.Activo)
             return BadRequest(new { message = "El usuario seleccionado no existe o no está activo." });
+
+        // Únicamente usuarios con rol Omega pueden agregarse como integrantes
+        if (!HasOmegaRole(usuario.Rol))
+            return BadRequest(new { message = $"El usuario '{usuario.Nombre}' no tiene el rol 'Omega' y no puede agregarse como integrante de un área." });
 
         // Verificar si ya pertenece a otra área (no se permite pertenecer a varias áreas simultáneamente)
         var existingAssignment = await _context.AreaIntegrantes
@@ -332,6 +343,10 @@ public class AreasController : ControllerBase
 
         if (usuarios.Count != distinctIds.Count)
             return BadRequest(new { message = "Uno o más usuarios seleccionados no existen o no están activos." });
+
+        var nonOmegaUser = usuarios.FirstOrDefault(u => !HasOmegaRole(u.Rol));
+        if (nonOmegaUser != null)
+            return BadRequest(new { message = $"Solo se pueden agregar usuarios con rol 'Omega'. El usuario '{nonOmegaUser.Nombre}' tiene rol '{nonOmegaUser.Rol}'." });
 
         var existingAssignments = await _context.AreaIntegrantes
             .Include(ai => ai.Area)
@@ -440,7 +455,7 @@ public class AreasController : ControllerBase
 
     // GET: api/areas/usuarios-disponibles
     [HttpGet("usuarios-disponibles")]
-    public async Task<IActionResult> GetUsuariosDisponibles([FromQuery] bool soloSinArea = false)
+    public async Task<IActionResult> GetUsuariosDisponibles([FromQuery] bool soloSinArea = false, [FromQuery] bool soloOmega = false)
     {
         var userName = GetUserName();
         var userId = GetUserId();
@@ -475,7 +490,7 @@ public class AreasController : ControllerBase
             .ToDictionaryAsync(ai => ai.UsuarioId, ai => new { ai.AreaId, AreaNombre = ai.Area != null ? ai.Area.Nombre : "" });
 
         var result = users
-            .Where(u => !soloSinArea || !asignaciones.ContainsKey(u.Id))
+            .Where(u => (!soloSinArea || !asignaciones.ContainsKey(u.Id)) && (!soloOmega || HasOmegaRole(u.Rol)))
             .Select(u => new
             {
                 u.Id,

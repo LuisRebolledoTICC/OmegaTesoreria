@@ -597,9 +597,12 @@ export const api = {
     return handleResponse<MiAreaInfo>(res);
   },
 
-  async getUsuariosDisponiblesArea(soloSinArea = false): Promise<UsuarioDisponible[]> {
-    const query = soloSinArea ? '?soloSinArea=true' : '';
-    const res = await fetch(`${API_BASE_URL}/areas/usuarios-disponibles${query}`, { headers: getHeaders() });
+  async getUsuariosDisponiblesArea(soloSinArea = false, soloOmega = false): Promise<UsuarioDisponible[]> {
+    const params = new URLSearchParams();
+    if (soloSinArea) params.append('soloSinArea', 'true');
+    if (soloOmega) params.append('soloOmega', 'true');
+    const qs = params.toString();
+    const res = await fetch(`${API_BASE_URL}/areas/usuarios-disponibles${qs ? `?${qs}` : ''}`, { headers: getHeaders() });
     return handleResponse<UsuarioDisponible[]>(res);
   },
 

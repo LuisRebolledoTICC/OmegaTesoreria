@@ -68,7 +68,9 @@ export const UsuariosView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRolesFilter, setSelectedRolesFilter] = useState<string[]>([]);
   const [showRoleFilterMenu, setShowRoleFilterMenu] = useState(false);
+  const [roleFilterPos, setRoleFilterPos] = useState<{ top: number; left: number } | null>(null);
   const roleFilterRef = useRef<HTMLDivElement>(null);
+  const roleFilterBtnRef = useRef<HTMLButtonElement>(null);
   const [sortField, setSortField] = useState<'nombre' | 'userName' | 'rol' | 'activo' | 'fechaCreacion'>('nombre');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -704,8 +706,8 @@ export const UsuariosView: React.FC = () => {
           </div>
 
           {/* Vista Desktop/Tablet en Tabla (>= md) */}
-          <div className="hidden md:block bg-white rounded-xl border border-slate-200 shadow-xs overflow-visible">
-            <div className="overflow-x-auto">
+          <div className="hidden md:block bg-white rounded-xl border border-slate-200 shadow-xs overflow-visible min-h-[526px]">
+            <div className="overflow-x-auto overflow-y-visible min-h-[526px]">
               <table className="w-full text-xs text-left whitespace-nowrap">
               <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider border-b border-slate-200">
                 <tr>
@@ -753,8 +755,18 @@ export const UsuariosView: React.FC = () => {
                         )}
                       </button>
                       <button
+                        ref={roleFilterBtnRef}
                         type="button"
-                        onClick={() => setShowRoleFilterMenu((prev) => !prev)}
+                        onClick={() => {
+                          if (!showRoleFilterMenu && roleFilterBtnRef.current) {
+                            const rect = roleFilterBtnRef.current.getBoundingClientRect();
+                            setRoleFilterPos({
+                              top: rect.bottom + 6,
+                              left: Math.min(rect.left, window.innerWidth - 256),
+                            });
+                          }
+                          setShowRoleFilterMenu((prev) => !prev);
+                        }}
                         title="Filtrar por rol de acceso"
                         className={`p-1 rounded-md border transition cursor-pointer ${
                           selectedRolesFilter.length > 0
@@ -765,8 +777,11 @@ export const UsuariosView: React.FC = () => {
                         <Filter className="w-3 h-3" />
                       </button>
 
-                      {showRoleFilterMenu && (
-                        <div className="absolute left-0 top-full mt-1 w-60 bg-white border border-slate-200 rounded-xl shadow-xl z-40 p-2.5 normal-case font-normal">
+                      {showRoleFilterMenu && roleFilterPos && (
+                        <div
+                          style={{ top: roleFilterPos.top, left: roleFilterPos.left }}
+                          className="fixed w-60 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 p-2.5 normal-case font-normal"
+                        >
                           <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
                             <span className="text-[11px] font-bold text-slate-700 uppercase">Filtrar por Rol</span>
                             <button
@@ -863,7 +878,7 @@ export const UsuariosView: React.FC = () => {
                   </tr>
                 ) : (
                   paginatedUsers.map((u) => (
-                    <tr key={u.id} className="hover:bg-slate-50">
+                    <tr key={u.id} className="hover:bg-slate-50 h-12">
                       <td className="p-3 font-mono text-slate-500">#{u.id}</td>
                       <td className="p-3 font-bold text-slate-900">{u.userName}</td>
                       <td className="p-3 text-slate-700">{u.nombre}</td>

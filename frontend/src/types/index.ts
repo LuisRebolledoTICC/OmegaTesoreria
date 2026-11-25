@@ -3,6 +3,7 @@ export interface User {
   userName: string;
   nombre: string;
   rol: string;
+  roles?: string[];
   activo: boolean;
   fechaCreacion: string;
   ultimoAcceso?: string;
@@ -22,6 +23,7 @@ export interface LoginResponse {
   userName: string;
   nombre: string;
   rol: string;
+  roles?: string[];
   modulosPermitidos?: string[];
 }
 
@@ -295,6 +297,7 @@ export interface UsuarioDisponible {
   nombre: string;
   userName: string;
   rol: string;
+  roles?: string[];
   areaActualId?: number | null;
   areaActualNombre?: string | null;
 }

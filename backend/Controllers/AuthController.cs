@@ -72,7 +72,7 @@ public class AuthController : ControllerBase
         var currentUser = User.Identity?.Name ?? "Sistema";
         var user = await _authService.CreateUserAsync(request, currentUser);
         if (user == null)
-            return BadRequest(new { message = "El nombre de usuario ya está en uso." });
+            return BadRequest(new { message = "El nombre de usuario ya está en uso o no se asignaron roles válidos." });
 
         return Ok(user);
     }

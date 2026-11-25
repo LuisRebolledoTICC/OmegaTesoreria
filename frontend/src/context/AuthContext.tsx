@@ -6,6 +6,7 @@ interface AuthUser {
   userName: string;
   nombre: string;
   rol: string;
+  roles?: string[];
   modulosPermitidos?: string[];
 }
 
@@ -14,7 +15,8 @@ interface AuthContextType {
   token: string | null;
   login: (u: string, p: string) => Promise<void>;
   logout: () => void;
-  updateSession: (res: { id?: number; token: string; userName: string; nombre: string; rol: string; modulosPermitidos?: string[] }) => void;
+  updateSession: (res: { id?: number; token: string; userName: string; nombre: string; rol: string; roles?: string[]; modulosPermitidos?: string[] }) => void;
+  hasRole: (roleName: string) => boolean;
   isAdmin: boolean;
   isTesorero: boolean;
   canOperate: boolean;
@@ -40,6 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       userName: res.userName,
       nombre: res.nombre,
       rol: res.rol,
+      roles: res.roles,
       modulosPermitidos: res.modulosPermitidos,
     };
     setUser(authUser);
@@ -55,12 +58,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('omega_token');
   };
 
-  const updateSession = (res: { id?: number; token: string; userName: string; nombre: string; rol: string; modulosPermitidos?: string[] }) => {
+  const updateSession = (res: { id?: number; token: string; userName: string; nombre: string; rol: string; roles?: string[]; modulosPermitidos?: string[] }) => {
     const authUser: AuthUser = {
       id: res.id,
       userName: res.userName,
       nombre: res.nombre,
       rol: res.rol,
+      roles: res.roles,
       modulosPermitidos: res.modulosPermitidos,
     };
     setUser(authUser);
@@ -69,13 +73,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('omega_token', res.token);
   };
 
-  const isAdmin = user?.rol === 'Administrador';
-  const isTesorero = user?.rol === 'Tesorero' || isAdmin;
-  const canOperate = isAdmin || user?.rol === 'Tesorero' || (user?.modulosPermitidos?.includes('conteo') ?? false);
+  const getUserRoles = (): string[] => {
+    if (!user) return [];
+    if (user.roles && user.roles.length > 0) return user.roles;
+    return (user.rol || '')
+      .split(/[,;|]/)
+      .map((r) => r.trim())
+      .filter(Boolean);
+  };
+
+  const hasRole = (roleName: string): boolean => {
+    return getUserRoles().some((r) => r.toLowerCase() === roleName.toLowerCase());
+  };
+
+  const isAdmin = hasRole('Administrador');
+  const isTesorero = hasRole('Tesorero') || isAdmin;
+  const canOperate = isAdmin || hasRole('Tesorero') || (user?.modulosPermitidos?.includes('conteo') ?? false);
 
   const canAccessModule = (modulo: string): boolean => {
     if (!user) return false;
-    if (user.rol === 'Administrador') return true;
+    if (isAdmin) return true;
     if (user.modulosPermitidos && user.modulosPermitidos.length > 0) {
       return user.modulosPermitidos.includes(modulo);
     }
@@ -87,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, updateSession, isAdmin, isTesorero, canOperate, canAccessModule }}>
+    <AuthContext.Provider value={{ user, token, login, logout, updateSession, hasRole, isAdmin, isTesorero, canOperate, canAccessModule }}>
       {children}
     </AuthContext.Provider>
   );

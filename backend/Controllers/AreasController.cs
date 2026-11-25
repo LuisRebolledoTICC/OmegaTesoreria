@@ -27,11 +27,29 @@ public class AreasController : ControllerBase
     private int GetUserId() => int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
     private bool IsAdmin() => User.IsInRole("Administrador");
 
-    private static bool HasOmegaRole(string? rol)
+    private static List<string> GetUserRoleNames(User user)
     {
-        if (string.IsNullOrWhiteSpace(rol)) return false;
-        var parts = rol.Split(new[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return parts.Any(p => p.Equals("Omega", StringComparison.OrdinalIgnoreCase));
+        if (user.UsuarioRoles != null && user.UsuarioRoles.Count > 0)
+        {
+            var fromJoin = user.UsuarioRoles
+                .Where(ur => ur.RolPersonalizado != null && !string.IsNullOrWhiteSpace(ur.RolPersonalizado.Nombre))
+                .Select(ur => ur.RolPersonalizado!.Nombre)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (fromJoin.Count > 0) return fromJoin;
+        }
+
+        return (user.Rol ?? "")
+            .Split(new[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static bool HasOmegaRole(User user)
+    {
+        return GetUserRoleNames(user).Any(p => p.Equals("Omega", StringComparison.OrdinalIgnoreCase));
     }
 
     // GET: api/areas
@@ -268,12 +286,15 @@ public class AreasController : ControllerBase
         if (!canManage) return Forbid();
 
         // Verificar que el usuario existe y está activo
-        var usuario = await _context.Users.FindAsync(request.UsuarioId);
+        var usuario = await _context.Users
+            .Include(u => u.UsuarioRoles)
+                .ThenInclude(ur => ur.RolPersonalizado)
+            .FirstOrDefaultAsync(u => u.Id == request.UsuarioId);
         if (usuario == null || !usuario.Activo)
             return BadRequest(new { message = "El usuario seleccionado no existe o no está activo." });
 
         // Únicamente usuarios con rol Omega pueden agregarse como integrantes
-        if (!HasOmegaRole(usuario.Rol))
+        if (!HasOmegaRole(usuario))
             return BadRequest(new { message = $"El usuario '{usuario.Nombre}' no tiene el rol 'Omega' y no puede agregarse como integrante de un área." });
 
         // Verificar si ya pertenece a otra área (no se permite pertenecer a varias áreas simultáneamente)
@@ -338,13 +359,15 @@ public class AreasController : ControllerBase
             return BadRequest(new { message = "Debes seleccionar al menos un usuario." });
 
         var usuarios = await _context.Users
+            .Include(u => u.UsuarioRoles)
+                .ThenInclude(ur => ur.RolPersonalizado)
             .Where(u => distinctIds.Contains(u.Id) && u.Activo)
             .ToListAsync();
 
         if (usuarios.Count != distinctIds.Count)
             return BadRequest(new { message = "Uno o más usuarios seleccionados no existen o no están activos." });
 
-        var nonOmegaUser = usuarios.FirstOrDefault(u => !HasOmegaRole(u.Rol));
+        var nonOmegaUser = usuarios.FirstOrDefault(u => !HasOmegaRole(u));
         if (nonOmegaUser != null)
             return BadRequest(new { message = $"Solo se pueden agregar usuarios con rol 'Omega'. El usuario '{nonOmegaUser.Nombre}' tiene rol '{nonOmegaUser.Rol}'." });
 
@@ -474,15 +497,10 @@ public class AreasController : ControllerBase
         }
 
         var users = await _context.Users
+            .Include(u => u.UsuarioRoles)
+                .ThenInclude(ur => ur.RolPersonalizado)
             .Where(u => u.Activo)
             .OrderBy(u => u.Nombre)
-            .Select(u => new
-            {
-                u.Id,
-                u.Nombre,
-                u.UserName,
-                u.Rol
-            })
             .ToListAsync();
 
         var asignaciones = await _context.AreaIntegrantes
@@ -490,15 +508,20 @@ public class AreasController : ControllerBase
             .ToDictionaryAsync(ai => ai.UsuarioId, ai => new { ai.AreaId, AreaNombre = ai.Area != null ? ai.Area.Nombre : "" });
 
         var result = users
-            .Where(u => (!soloSinArea || !asignaciones.ContainsKey(u.Id)) && (!soloOmega || HasOmegaRole(u.Rol)))
-            .Select(u => new
+            .Where(u => (!soloSinArea || !asignaciones.ContainsKey(u.Id)) && (!soloOmega || HasOmegaRole(u)))
+            .Select(u =>
             {
-                u.Id,
-                u.Nombre,
-                u.UserName,
-                u.Rol,
-                AreaActualId = asignaciones.ContainsKey(u.Id) ? (int?)asignaciones[u.Id].AreaId : null,
-                AreaActualNombre = asignaciones.ContainsKey(u.Id) ? asignaciones[u.Id].AreaNombre : null
+                var roles = GetUserRoleNames(u);
+                return new
+                {
+                    u.Id,
+                    u.Nombre,
+                    u.UserName,
+                    Rol = roles.Count > 0 ? string.Join(", ", roles) : u.Rol,
+                    Roles = roles,
+                    AreaActualId = asignaciones.ContainsKey(u.Id) ? (int?)asignaciones[u.Id].AreaId : null,
+                    AreaActualNombre = asignaciones.ContainsKey(u.Id) ? asignaciones[u.Id].AreaNombre : null
+                };
             });
 
         return Ok(result);

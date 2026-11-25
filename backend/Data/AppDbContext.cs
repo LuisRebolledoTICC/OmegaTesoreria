@@ -20,6 +20,7 @@ public class AppDbContext : DbContext, IDataProtectionKeyContext
     public DbSet<Conteo> Conteos => Set<Conteo>();
     public DbSet<Auditoria> Auditoria => Set<Auditoria>();
     public DbSet<RolPersonalizado> RolesPersonalizados => Set<RolPersonalizado>();
+    public DbSet<UsuarioRol> UsuarioRoles => Set<UsuarioRol>();
 
     // Módulo Ventas
     public DbSet<Venta> Ventas => Set<Venta>();
@@ -232,6 +233,22 @@ public class AppDbContext : DbContext, IDataProtectionKeyContext
 
         // Índices para rendimiento en PostgreSQL
         modelBuilder.Entity<User>().HasIndex(u => u.UserName).IsUnique();
+
+        modelBuilder.Entity<UsuarioRol>()
+            .HasOne(ur => ur.Usuario)
+            .WithMany(u => u.UsuarioRoles)
+            .HasForeignKey(ur => ur.UsuarioId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UsuarioRol>()
+            .HasOne(ur => ur.RolPersonalizado)
+            .WithMany(r => r.UsuarioRoles)
+            .HasForeignKey(ur => ur.RolPersonalizadoId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UsuarioRol>()
+            .HasIndex(ur => new { ur.UsuarioId, ur.RolPersonalizadoId })
+            .IsUnique();
         modelBuilder.Entity<Operacion>().HasIndex(o => o.FechaOperacion);
         modelBuilder.Entity<Operacion>().HasIndex(o => o.TipoOperacion);
         modelBuilder.Entity<Conteo>().HasIndex(c => c.FechaConteo);

@@ -6,10 +6,12 @@ public class User
     public string UserName { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
     public string Nombre { get; set; } = string.Empty;
-    public string Rol { get; set; } = "Consulta"; // Administrador, Tesorero, Consulta
+    public string Rol { get; set; } = "Consulta"; // Resumen / compatibilidad
     public bool Activo { get; set; } = true;
     public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
     public DateTime? UltimoAcceso { get; set; }
+
+    public ICollection<UsuarioRol> UsuarioRoles { get; set; } = new List<UsuarioRol>();
 }
 
 public class RolPersonalizado
@@ -20,6 +22,19 @@ public class RolPersonalizado
     public bool EsSistema { get; set; } = false; // Administrador, Tesorero, Consulta son del sistema
     public string ModulosPermitidosJson { get; set; } = "[]"; // Array de IDs de módulos: ["dashboard","cajas","conteo","operaciones","reportes","usuarios"]
     public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
+
+    public ICollection<UsuarioRol> UsuarioRoles { get; set; } = new List<UsuarioRol>();
+}
+
+public class UsuarioRol
+{
+    public int Id { get; set; }
+    public int UsuarioId { get; set; }
+    public int RolPersonalizadoId { get; set; }
+    public DateTime FechaAsignacion { get; set; } = DateTime.UtcNow;
+
+    public User? Usuario { get; set; }
+    public RolPersonalizado? RolPersonalizado { get; set; }
 }
 
 public class Caja

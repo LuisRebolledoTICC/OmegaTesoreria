@@ -782,6 +782,33 @@ namespace backend.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.UsuarioRol", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("FechaAsignacion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RolPersonalizadoId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RolPersonalizadoId");
+
+                    b.HasIndex("UsuarioId", "RolPersonalizadoId")
+                        .IsUnique();
+
+                    b.ToTable("UsuarioRoles");
+                });
+
             modelBuilder.Entity("OmegaTesoreria.Api.Models.Venta", b =>
                 {
                     b.Property<int>("Id")
@@ -1135,6 +1162,33 @@ namespace backend.Migrations
                     b.Navigation("Pagos");
                 });
 
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.UsuarioRol", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("FechaAsignacion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RolPersonalizadoId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RolPersonalizadoId");
+
+                    b.HasIndex("UsuarioId", "RolPersonalizadoId")
+                        .IsUnique();
+
+                    b.ToTable("UsuarioRoles");
+                });
+
             modelBuilder.Entity("OmegaTesoreria.Api.Models.Venta", b =>
                 {
                     b.Navigation("Pedidos");
@@ -1145,6 +1199,35 @@ namespace backend.Migrations
             modelBuilder.Entity("OmegaTesoreria.Api.Models.VentaProducto", b =>
                 {
                     b.Navigation("Presentaciones");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.UsuarioRol", b =>
+                {
+                    b.HasOne("OmegaTesoreria.Api.Models.RolPersonalizado", "RolPersonalizado")
+                        .WithMany("UsuarioRoles")
+                        .HasForeignKey("RolPersonalizadoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OmegaTesoreria.Api.Models.User", "Usuario")
+                        .WithMany("UsuarioRoles")
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RolPersonalizado");
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.RolPersonalizado", b =>
+                {
+                    b.Navigation("UsuarioRoles");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.User", b =>
+                {
+                    b.Navigation("UsuarioRoles");
                 });
 #pragma warning restore 612, 618
         }

@@ -80,7 +80,7 @@ export const UsuariosView: React.FC = () => {
   const [userName, setUserName] = useState('');
   const [password, setPassword] = useState('');
   const [nombre, setNombre] = useState('');
-  const [rol, setRol] = useState<string>('Tesorero');
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(['Tesorero']);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -97,7 +97,7 @@ export const UsuariosView: React.FC = () => {
   const [userForEdit, setUserForEdit] = useState<User | null>(null);
   const [editUserName, setEditUserName] = useState('');
   const [editNombre, setEditNombre] = useState('');
-  const [editRol, setEditRol] = useState<string>('Tesorero');
+  const [editRoles, setEditRoles] = useState<string[]>([]);
   const [editError, setEditError] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -124,8 +124,8 @@ export const UsuariosView: React.FC = () => {
       ]);
       setUsers(usersData);
       setRoles(rolesData);
-      if (rolesData.length > 0 && !rol) {
-        setRol(rolesData[0].nombre);
+      if (rolesData.length > 0 && selectedRoles.length === 0) {
+        setSelectedRoles([rolesData[0].nombre]);
       }
     } catch (err) {
       console.error(err);
@@ -154,13 +154,26 @@ export const UsuariosView: React.FC = () => {
     setCurrentPage(1);
   }, [searchTerm, selectedRolesFilter, pageSize]);
 
+  const getUserRolesList = (u: User): string[] => {
+    if (u.roles && u.roles.length > 0) return u.roles;
+    if (!u.rol) return [];
+    return u.rol
+      .split(/[,;|]/)
+      .map((r) => r.trim())
+      .filter(Boolean);
+  };
+
+  const toggleRoleInList = (list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>, roleName: string) => {
+    setList(list.includes(roleName) ? list.filter((r) => r !== roleName) : [...list, roleName]);
+  };
+
   const availableRoleNames = useMemo(() => {
     const set = new Set<string>();
     roles.forEach((r) => {
       if (r.nombre) set.add(r.nombre);
     });
     users.forEach((u) => {
-      if (u.rol) set.add(u.rol);
+      getUserRolesList(u).forEach((roleName) => set.add(roleName));
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
   }, [roles, users]);
@@ -168,14 +181,15 @@ export const UsuariosView: React.FC = () => {
   const filteredAndSortedUsers = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     const filtered = users.filter((u) => {
-      if (selectedRolesFilter.length > 0 && !selectedRolesFilter.includes(u.rol)) {
+      const uRoles = getUserRolesList(u);
+      if (selectedRolesFilter.length > 0 && !uRoles.some((r) => selectedRolesFilter.includes(r))) {
         return false;
       }
       if (!term) return true;
       return (
         u.nombre.toLowerCase().includes(term) ||
         u.userName.toLowerCase().includes(term) ||
-        u.rol.toLowerCase().includes(term)
+        uRoles.some((r) => r.toLowerCase().includes(term))
       );
     });
 
@@ -187,7 +201,7 @@ export const UsuariosView: React.FC = () => {
       } else if (sortField === 'userName') {
         cmp = a.userName.localeCompare(b.userName, 'es', { sensitivity: 'base' });
       } else if (sortField === 'rol') {
-        cmp = a.rol.localeCompare(b.rol, 'es', { sensitivity: 'base' });
+        cmp = getUserRolesList(a).join(', ').localeCompare(getUserRolesList(b).join(', '), 'es', { sensitivity: 'base' });
       } else if (sortField === 'activo') {
         cmp = (a.activo === b.activo) ? 0 : a.activo ? -1 : 1;
       } else if (sortField === 'fechaCreacion') {
@@ -231,6 +245,10 @@ export const UsuariosView: React.FC = () => {
       setError('Todos los campos son obligatorios.');
       return;
     }
+    if (selectedRoles.length === 0) {
+      setError('Debes seleccionar al menos un rol para el usuario.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -238,12 +256,14 @@ export const UsuariosView: React.FC = () => {
         userName: userName.trim(),
         password,
         nombre: nombre.trim(),
-        rol,
+        rol: selectedRoles.join(', '),
+        roles: selectedRoles,
       });
       setShowModal(false);
       setUserName('');
       setPassword('');
       setNombre('');
+      if (roles.length > 0) setSelectedRoles([roles[0].nombre]);
       loadData();
     } catch (err: any) {
       setError(err.message || 'Error al crear usuario.');
@@ -277,10 +297,12 @@ export const UsuariosView: React.FC = () => {
     setSavingPassword(true);
     setPasswordError(null);
     try {
+      const currentRoles = getUserRolesList(userForPassword);
       await api.updateUser(userForPassword.id, {
         nombre: userForPassword.nombre,
         userName: userForPassword.userName,
-        rol: userForPassword.rol,
+        rol: currentRoles.join(', ') || userForPassword.rol,
+        roles: currentRoles,
         activo: userForPassword.activo,
         newPassword: newPassword.trim(),
       });
@@ -300,7 +322,7 @@ export const UsuariosView: React.FC = () => {
     setUserForEdit(u);
     setEditUserName(u.userName);
     setEditNombre(u.nombre);
-    setEditRol(u.rol);
+    setEditRoles(getUserRolesList(u));
     setEditError(null);
   };
 
@@ -318,13 +340,19 @@ export const UsuariosView: React.FC = () => {
       return;
     }
 
+    if (editRoles.length === 0) {
+      setEditError('Debes asignar al menos un rol de acceso.');
+      return;
+    }
+
     setSavingEdit(true);
     setEditError(null);
     try {
       await api.updateUser(userForEdit.id, {
         userName: editUserName.trim(),
         nombre: editNombre.trim(),
-        rol: editRol,
+        rol: editRoles.join(', '),
+        roles: editRoles,
         activo: userForEdit.activo,
       });
       setUserForEdit(null);
@@ -644,12 +672,19 @@ export const UsuariosView: React.FC = () => {
                   </div>
 
                   <div className="grid grid-cols-1 gap-1.5 text-xs text-slate-600 pt-2 border-t border-slate-100">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Rol:</span>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
-                        <Shield className="w-3 h-3 mr-1" />
-                        {u.rol}
-                      </span>
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-slate-400 shrink-0">Roles:</span>
+                      <div className="flex flex-wrap justify-end gap-1">
+                        {getUserRolesList(u).map((roleName) => (
+                          <span
+                            key={roleName}
+                            className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-200"
+                          >
+                            <Shield className="w-3 h-3 mr-1" />
+                            {roleName}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-slate-400">Creación:</span>
@@ -883,10 +918,17 @@ export const UsuariosView: React.FC = () => {
                       <td className="p-3 font-bold text-slate-900">{u.userName}</td>
                       <td className="p-3 text-slate-700">{u.nombre}</td>
                       <td className="p-3">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
-                          <Shield className="w-3 h-3 mr-1" />
-                          {u.rol}
-                        </span>
+                        <div className="flex flex-wrap gap-1 max-w-[260px]">
+                          {getUserRolesList(u).map((roleName) => (
+                            <span
+                              key={roleName}
+                              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200"
+                            >
+                              <Shield className="w-3 h-3 mr-1" />
+                              {roleName}
+                            </span>
+                          ))}
+                        </div>
                       </td>
                       <td className="p-3">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${u.activo ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
@@ -1141,18 +1183,35 @@ export const UsuariosView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Rol de Acceso:</label>
-                <select
-                  value={rol}
-                  onChange={(e) => setRol(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                >
-                  {roles.map((r) => (
-                    <option key={r.id} value={r.nombre}>
-                      {r.nombre}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase">Roles de Acceso:</label>
+                  <span className="text-[11px] font-semibold text-amber-700">
+                    {selectedRoles.length} seleccionado(s)
+                  </span>
+                </div>
+                <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-xl p-2 bg-slate-50 space-y-1">
+                  {roles.map((r) => {
+                    const checked = selectedRoles.includes(r.nombre);
+                    return (
+                      <label
+                        key={r.id}
+                        className={`flex items-center space-x-2.5 px-2.5 py-2 rounded-lg border cursor-pointer transition text-xs ${
+                          checked
+                            ? 'bg-amber-50 border-amber-300 text-slate-900 font-bold'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleRoleInList(selectedRoles, setSelectedRoles, r.nombre)}
+                          className="rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                        />
+                        <span className="truncate">{r.nombre}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="flex justify-end space-x-2 pt-4 border-t border-slate-100">
@@ -1301,18 +1360,35 @@ export const UsuariosView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Rol de Acceso:</label>
-                <select
-                  value={editRol}
-                  onChange={(e) => setEditRol(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                >
-                  {roles.map((r) => (
-                    <option key={r.id} value={r.nombre}>
-                      {r.nombre}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase">Roles de Acceso:</label>
+                  <span className="text-[11px] font-semibold text-blue-700">
+                    {editRoles.length} seleccionado(s)
+                  </span>
+                </div>
+                <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-xl p-2 bg-slate-50 space-y-1">
+                  {roles.map((r) => {
+                    const checked = editRoles.includes(r.nombre);
+                    return (
+                      <label
+                        key={r.id}
+                        className={`flex items-center space-x-2.5 px-2.5 py-2 rounded-lg border cursor-pointer transition text-xs ${
+                          checked
+                            ? 'bg-blue-50 border-blue-300 text-slate-900 font-bold'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleRoleInList(editRoles, setEditRoles, r.nombre)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="truncate">{r.nombre}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="flex justify-end space-x-2 pt-4 border-t border-slate-100">

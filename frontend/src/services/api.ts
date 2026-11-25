@@ -72,7 +72,7 @@ export const api = {
     return handleResponse<User[]>(res);
   },
 
-  async createUser(data: { userName: string; password: string; nombre: string; rol: string }): Promise<User> {
+  async createUser(data: { userName: string; password: string; nombre: string; rol: string; roles?: string[] }): Promise<User> {
     const res = await fetch(`${API_BASE_URL}/auth/users`, {
       method: 'POST',
       headers: getHeaders(),
@@ -81,7 +81,7 @@ export const api = {
     return handleResponse<User>(res);
   },
 
-  async updateUser(id: number, data: { nombre: string; rol: string; activo: boolean; newPassword?: string; userName?: string }): Promise<void> {
+  async updateUser(id: number, data: { nombre: string; rol: string; activo: boolean; newPassword?: string; userName?: string; roles?: string[] }): Promise<void> {
     const res = await fetch(`${API_BASE_URL}/auth/users/${id}`, {
       method: 'PUT',
       headers: getHeaders(),

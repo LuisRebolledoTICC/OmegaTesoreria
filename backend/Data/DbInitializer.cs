@@ -18,6 +18,7 @@ public static class DbInitializer
             await AddColumnIfNotExistsAsync(context, "TiposBolsas", "CajaId", "INTEGER NULL REFERENCES Cajas(Id)");
             await AddColumnIfNotExistsAsync(context, "Cajas", "Tipo", "TEXT NOT NULL DEFAULT 'EFECTIVO'");
             await EnsureSqliteAreasInventariosTablesAsync(context);
+            await EnsureSqliteUsuarioRolesTableAsync(context);
         }
         else
         {
@@ -195,6 +196,9 @@ public static class DbInitializer
             await context.SaveChangesAsync();
         }
 
+        // 3b. Backfill UsuarioRoles para conservar asignaciones existentes
+        await BackfillUsuarioRolesAsync(context);
+
         // 4. Seed Cajas Iniciales
         if (!await context.Cajas.AnyAsync(c => c.Tipo == "EFECTIVO"))
         {
@@ -357,5 +361,69 @@ public static class DbInitializer
             }
         }
         catch { }
+    }
+
+    private static async Task EnsureSqliteUsuarioRolesTableAsync(AppDbContext context)
+    {
+        var statements = new[]
+        {
+            @"CREATE TABLE IF NOT EXISTS UsuarioRoles (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                UsuarioId INTEGER NOT NULL REFERENCES Users(Id) ON DELETE CASCADE,
+                RolPersonalizadoId INTEGER NOT NULL REFERENCES RolesPersonalizados(Id) ON DELETE CASCADE,
+                FechaAsignacion TEXT NOT NULL
+            );",
+            @"CREATE UNIQUE INDEX IF NOT EXISTS IX_UsuarioRoles_UsuarioId_RolPersonalizadoId ON UsuarioRoles(UsuarioId, RolPersonalizadoId);"
+        };
+
+        try
+        {
+            foreach (var sql in statements)
+            {
+                await context.Database.ExecuteSqlRawAsync(sql);
+            }
+        }
+        catch { }
+    }
+
+    private static async Task BackfillUsuarioRolesAsync(AppDbContext context)
+    {
+        var roles = await context.RolesPersonalizados.ToListAsync();
+        if (roles.Count == 0) return;
+
+        var usersWithoutRoles = await context.Users
+            .Include(u => u.UsuarioRoles)
+            .Where(u => !u.UsuarioRoles.Any())
+            .ToListAsync();
+
+        if (usersWithoutRoles.Count == 0) return;
+
+        var toAdd = new List<UsuarioRol>();
+        foreach (var user in usersWithoutRoles)
+        {
+            var roleNames = (user.Rol ?? "")
+                .Split(new[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var roleName in roleNames)
+            {
+                var matchedRole = roles.FirstOrDefault(r => r.Nombre.Equals(roleName, StringComparison.OrdinalIgnoreCase));
+                if (matchedRole != null)
+                {
+                    toAdd.Add(new UsuarioRol
+                    {
+                        UsuarioId = user.Id,
+                        RolPersonalizadoId = matchedRole.Id,
+                        FechaAsignacion = DateTime.UtcNow
+                    });
+                }
+            }
+        }
+
+        if (toAdd.Count > 0)
+        {
+            await context.UsuarioRoles.AddRangeAsync(toAdd);
+            await context.SaveChangesAsync();
+        }
     }
 }

@@ -179,12 +179,17 @@ export const AreasView: React.FC = () => {
     }
   };
 
-  const hasOmegaRole = (rol?: string | null): boolean => {
-    if (!rol) return false;
-    return rol
+  const getUserRolesList = (u: UsuarioDisponible): string[] => {
+    if (u.roles && u.roles.length > 0) return u.roles;
+    if (!u.rol) return [];
+    return u.rol
       .split(/[,;|]/)
-      .map((r) => r.trim().toLowerCase())
-      .includes('omega');
+      .map((r) => r.trim())
+      .filter(Boolean);
+  };
+
+  const hasOmegaRole = (u: UsuarioDisponible): boolean => {
+    return getUserRolesList(u).some((r) => r.toLowerCase() === 'omega');
   };
 
   const handleOpenAddIntegrante = async () => {
@@ -199,7 +204,7 @@ export const AreasView: React.FC = () => {
   // Solo usuarios con rol Omega y sin área asignada
   const availableUnassignedUsers = useMemo(() => {
     return usuariosDisponibles.filter(
-      (u) => (u.areaActualId === null || u.areaActualId === undefined) && hasOmegaRole(u.rol)
+      (u) => (u.areaActualId === null || u.areaActualId === undefined) && hasOmegaRole(u)
     );
   }, [usuariosDisponibles]);
 
@@ -746,9 +751,22 @@ export const AreasView: React.FC = () => {
                             <td className="py-3 px-4 font-semibold text-slate-800">{u.nombre}</td>
                             <td className="py-3 px-4 font-mono text-slate-600">@{u.userName}</td>
                             <td className="py-3 px-4">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                {u.rol || 'Sin rol'}
-                              </span>
+                              <div className="flex flex-wrap gap-1">
+                                {getUserRolesList(u).length > 0 ? (
+                                  getUserRolesList(u).map((roleName) => (
+                                    <span
+                                      key={roleName}
+                                      className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200"
+                                    >
+                                      {roleName}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                    Sin rol
+                                  </span>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   LayoutDashboard,
   Wallet,
@@ -11,9 +11,12 @@ import {
   ShoppingBag,
   Building2,
   Package,
-  X
+  X,
+  UserCog,
+  ChevronUp
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { PerfilModal } from './PerfilModal';
 
 export type ActiveTab =
   | 'dashboard'
@@ -50,6 +53,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return saved === 'true';
   });
   const [tooltip, setTooltip] = useState<{ label: string; subLabel?: string; top: number } | null>(null);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showMobileUserMenu, setShowMobileUserMenu] = useState(false);
+  const [showPerfilModal, setShowPerfilModal] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    if (showUserMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showUserMenu]);
 
   const isCollapsed = externalIsCollapsed !== undefined ? externalIsCollapsed : internalIsCollapsed;
   const setIsCollapsed = externalSetIsCollapsed !== undefined ? externalSetIsCollapsed : setInternalIsCollapsed;
@@ -174,19 +193,58 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* 3. User Profile & Logout - Siempre anclado al fondo */}
         <div
-          className={`shrink-0 border-t border-slate-800 bg-slate-950/60 ${
+          ref={userMenuRef}
+          className={`relative shrink-0 border-t border-slate-800 bg-slate-950/60 ${
             isCollapsed ? 'py-3 px-2 flex flex-col items-center space-y-2.5' : 'p-4'
           }`}
         >
+          {showUserMenu && (
+            <div
+              className={`absolute bottom-full mb-2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl py-1.5 z-50 min-w-[180px] ${
+                isCollapsed ? 'left-2' : 'left-4 right-4'
+              }`}
+            >
+              <div className="px-3 py-2 border-b border-slate-700/80">
+                <p className="text-xs font-bold text-white truncate">{user?.nombre}</p>
+                <p className="text-[11px] text-slate-400 truncate">@{user?.userName}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUserMenu(false);
+                  setShowPerfilModal(true);
+                }}
+                className="w-full flex items-center space-x-2 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700/80 hover:text-amber-300 transition cursor-pointer"
+              >
+                <UserCog className="w-4 h-4 text-amber-400" />
+                <span>Mi Perfil</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUserMenu(false);
+                  logout();
+                }}
+                className="w-full flex items-center space-x-2 px-3 py-2 text-xs font-medium text-rose-300 hover:bg-rose-950/60 transition cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Cerrar Sesión</span>
+              </button>
+            </div>
+          )}
+
           {isCollapsed ? (
             <>
-              <div
-                onMouseEnter={(e) => showFloatingTooltip(e, user?.nombre || 'Usuario', user?.rol)}
+              <button
+                type="button"
+                onClick={() => setShowUserMenu((prev) => !prev)}
+                onMouseEnter={(e) => showFloatingTooltip(e, user?.nombre || 'Usuario', `${user?.rol} • Clic para perfil`)}
                 onMouseLeave={() => setTooltip(null)}
-                className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white uppercase shadow-inner cursor-default"
+                aria-label="Menú de usuario"
+                className="w-9 h-9 rounded-full bg-slate-700 hover:bg-amber-500 hover:text-slate-950 flex items-center justify-center text-xs font-bold text-white uppercase shadow-inner transition cursor-pointer"
               >
                 {user?.nombre.charAt(0) || 'U'}
-              </div>
+              </button>
               <button
                 type="button"
                 onClick={logout}
@@ -201,18 +259,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ) : (
             <>
               <div className="flex items-center justify-between gap-2 mb-2">
-                <div className="flex items-center space-x-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white uppercase shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowUserMenu((prev) => !prev)}
+                  title="Abrir menú de perfil"
+                  className="flex items-center space-x-2.5 min-w-0 flex-1 text-left p-1 -m-1 rounded-lg hover:bg-slate-800/70 transition cursor-pointer group"
+                >
+                  <div className="w-8 h-8 rounded-full bg-slate-700 group-hover:bg-amber-500 group-hover:text-slate-950 flex items-center justify-center text-xs font-bold text-white uppercase shrink-0 transition">
                     {user?.nombre.charAt(0) || 'U'}
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-white truncate">{user?.nombre}</p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center space-x-1">
+                      <p className="text-xs font-semibold text-white truncate">{user?.nombre}</p>
+                      <ChevronUp className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
+                    </div>
                     <span className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 border border-slate-700 max-w-full truncate">
                       <ShieldCheck className="w-3 h-3 mr-1 shrink-0" />
                       <span className="truncate">{user?.rol}</span>
                     </span>
                   </div>
-                </div>
+                </button>
                 <button
                   type="button"
                   onClick={logout}
@@ -309,8 +375,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </nav>
 
         {/* 3. Mobile User Profile & Logout - Anclado al fondo */}
-        <div className="shrink-0 p-4 border-t border-slate-800 bg-slate-950/60 space-y-3">
-          <div className="flex items-center space-x-3 min-w-0">
+        <div className="relative shrink-0 p-4 border-t border-slate-800 bg-slate-950/60 space-y-3">
+          {showMobileUserMenu && (
+            <div className="bg-slate-800 border border-slate-700 rounded-xl py-1.5 shadow-xl">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMobileUserMenu(false);
+                  if (setIsMobileOpen) setIsMobileOpen(false);
+                  setShowPerfilModal(true);
+                }}
+                className="w-full flex items-center space-x-2 px-3.5 py-2.5 text-xs font-semibold text-slate-100 hover:bg-slate-700 transition"
+              >
+                <UserCog className="w-4 h-4 text-amber-400" />
+                <span>Mi Perfil (Editar datos / contraseña)</span>
+              </button>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setShowMobileUserMenu((prev) => !prev)}
+            className="w-full flex items-center space-x-3 min-w-0 text-left p-1.5 -m-1.5 rounded-xl hover:bg-slate-800/70 transition"
+          >
             <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-sm font-bold text-white uppercase shrink-0">
               {user?.nombre.charAt(0) || 'U'}
             </div>
@@ -321,7 +408,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {user?.rol}
               </span>
             </div>
-          </div>
+            <ChevronUp className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${showMobileUserMenu ? 'rotate-180' : ''}`} />
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -335,6 +423,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
       </aside>
+
+      <PerfilModal isOpen={showPerfilModal} onClose={() => setShowPerfilModal(false)} />
     </>
   );
 };

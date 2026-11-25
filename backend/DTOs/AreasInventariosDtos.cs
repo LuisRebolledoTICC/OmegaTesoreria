@@ -42,6 +42,11 @@ public class AddIntegranteRequest
     public bool ForzarCambio { get; set; } = false;
 }
 
+public class AddIntegrantesBatchRequest
+{
+    public List<int> UsuarioIds { get; set; } = new();
+}
+
 // ========== INVENTARIOS ==========
 
 public record ProductoDto(

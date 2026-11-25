@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Building2,
   Plus,
@@ -11,7 +11,9 @@ import {
   AlertCircle,
   CheckCircle2,
   X,
-  ArrowRightLeft
+  Search,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { Area, UsuarioDisponible } from '../types';
 import { api } from '../services/api';
@@ -38,12 +40,14 @@ export const AreasView: React.FC = () => {
   const [savingArea, setSavingArea] = useState(false);
   const [areaModalError, setAreaModalError] = useState<string | null>(null);
 
-  // Modal Agregar Integrante
+  // Modal Agregar Integrantes (tabla amplia con búsqueda, selección múltiple y paginación)
   const [showIntegranteModal, setShowIntegranteModal] = useState(false);
-  const [selectedUsuarioId, setSelectedUsuarioId] = useState<string>('');
+  const [integranteSearch, setIntegranteSearch] = useState('');
+  const [selectedIntegranteIds, setSelectedIntegranteIds] = useState<number[]>([]);
+  const [integrantePage, setIntegrantePage] = useState(1);
+  const INTEGRANTES_PAGE_SIZE = 8;
   const [addingIntegrante, setAddingIntegrante] = useState(false);
   const [integranteError, setIntegranteError] = useState<string | null>(null);
-  const [confirmTransfer, setConfirmTransfer] = useState<{ usuarioId: number; message: string; areaActual: string } | null>(null);
 
   const canCreateArea = isAdmin || canAccessModule('areas_crear');
   const canEditArea = isAdmin || canAccessModule('areas_editar');
@@ -70,9 +74,9 @@ export const AreasView: React.FC = () => {
     }
   };
 
-  const loadUsuariosDisponibles = async () => {
+  const loadUsuariosDisponibles = async (soloSinArea = false) => {
     try {
-      const data = await api.getUsuariosDisponiblesArea();
+      const data = await api.getUsuariosDisponiblesArea(soloSinArea);
       setUsuariosDisponibles(data);
     } catch {
       // Usuario sin permisos para listar usuarios disponibles
@@ -176,56 +180,66 @@ export const AreasView: React.FC = () => {
   };
 
   const handleOpenAddIntegrante = async () => {
-    setSelectedUsuarioId('');
+    setIntegranteSearch('');
+    setSelectedIntegranteIds([]);
+    setIntegrantePage(1);
     setIntegranteError(null);
-    setConfirmTransfer(null);
-    await loadUsuariosDisponibles();
+    await loadUsuariosDisponibles(true);
     setShowIntegranteModal(true);
   };
 
-  const handleAddIntegrante = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedArea || !selectedUsuarioId) {
-      setIntegranteError('Selecciona un usuario.');
-      return;
-    }
+  // Solo usuarios sin área asignada
+  const availableUnassignedUsers = useMemo(() => {
+    return usuariosDisponibles.filter((u) => u.areaActualId === null || u.areaActualId === undefined);
+  }, [usuariosDisponibles]);
 
-    const usuarioId = Number(selectedUsuarioId);
-    setAddingIntegrante(true);
-    setIntegranteError(null);
-    try {
-      const res = await api.addIntegranteArea(selectedArea.id, usuarioId, false);
-      showToast(res.message || 'Integrante agregado.');
-      setShowIntegranteModal(false);
-      await loadAreas(true);
-    } catch (err: any) {
-      if (err.status === 409 && err.requiereForzar) {
-        setConfirmTransfer({
-          usuarioId,
-          message: err.message,
-          areaActual: err.areaActual || 'otra área',
-        });
-      } else {
-        setIntegranteError(err.message || 'No se pudo agregar al integrante.');
-      }
-    } finally {
-      setAddingIntegrante(false);
+  const filteredModalUsers = useMemo(() => {
+    const term = integranteSearch.trim().toLowerCase();
+    if (!term) return availableUnassignedUsers;
+    return availableUnassignedUsers.filter(
+      (u) => u.nombre.toLowerCase().includes(term) || u.userName.toLowerCase().includes(term)
+    );
+  }, [availableUnassignedUsers, integranteSearch]);
+
+  const totalIntegrantePages = Math.max(1, Math.ceil(filteredModalUsers.length / INTEGRANTES_PAGE_SIZE));
+  const safeIntegrantePage = Math.min(integrantePage, totalIntegrantePages);
+  const paginatedModalUsers = useMemo(() => {
+    const start = (safeIntegrantePage - 1) * INTEGRANTES_PAGE_SIZE;
+    return filteredModalUsers.slice(start, start + INTEGRANTES_PAGE_SIZE);
+  }, [filteredModalUsers, safeIntegrantePage]);
+
+  const handleToggleIntegranteSelection = (userId: number) => {
+    setSelectedIntegranteIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const handleToggleSelectAllVisible = () => {
+    const visibleIds = paginatedModalUsers.map((u) => u.id);
+    const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIntegranteIds.includes(id));
+    if (allVisibleSelected) {
+      setSelectedIntegranteIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+    } else {
+      setSelectedIntegranteIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
     }
   };
 
-  const handleConfirmTransfer = async () => {
-    if (!selectedArea || !confirmTransfer) return;
+  const handleConfirmAddIntegrantes = async () => {
+    if (!selectedArea || selectedIntegranteIds.length === 0) {
+      setIntegranteError('Selecciona al menos un usuario para agregar.');
+      return;
+    }
+
     setAddingIntegrante(true);
     setIntegranteError(null);
     try {
-      const res = await api.addIntegranteArea(selectedArea.id, confirmTransfer.usuarioId, true);
-      showToast(res.message || 'Integrante reasignado.');
-      setConfirmTransfer(null);
+      const res = await api.addIntegrantesAreaBatch(selectedArea.id, selectedIntegranteIds);
+      showToast(res.message || `${selectedIntegranteIds.length} integrante(s) agregado(s).`);
       setShowIntegranteModal(false);
+      setSelectedIntegranteIds([]);
       await loadAreas(true);
     } catch (err: any) {
-      setIntegranteError(err.message || 'No se pudo mover al integrante.');
-      setConfirmTransfer(null);
+      setIntegranteError(err.message || 'No se pudieron agregar los integrantes.');
     } finally {
       setAddingIntegrante(false);
     }
@@ -591,102 +605,203 @@ export const AreasView: React.FC = () => {
         </div>
       )}
 
-      {/* Modal Agregar Integrante */}
+      {/* Modal Agregar Integrantes (Amplio, con tabla, búsqueda, selección múltiple y paginación) */}
       {showIntegranteModal && selectedArea && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <h3 className="text-base font-bold text-slate-900">
-                Agregar Integrante a {selectedArea.nombre}
-              </h3>
+          <div className="bg-white rounded-2xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90dvh]">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-slate-900">
+                  Agregar Integrantes a {selectedArea.nombre}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Solo se muestran usuarios activos que aún no pertenecen a ningún área.
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={() => {
-                  setShowIntegranteModal(false);
-                  setConfirmTransfer(null);
-                }}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+                onClick={() => setShowIntegranteModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {confirmTransfer ? (
-              <div className="p-5 space-y-4">
-                <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-1">
-                  <div className="flex items-center space-x-1.5 font-bold">
-                    <ArrowRightLeft className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>Usuario ya asignado a otra área</span>
-                  </div>
-                  <p>{confirmTransfer.message}</p>
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              {integranteError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{integranteError}</span>
                 </div>
-                <div className="flex justify-end space-x-2">
-                  <button
-                    type="button"
-                    onClick={() => setConfirmTransfer(null)}
-                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleConfirmTransfer}
-                    disabled={addingIntegrante}
-                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-lg shadow-xs disabled:opacity-50"
-                  >
-                    {addingIntegrante ? 'Moviendo...' : 'Sí, cambiar de área'}
-                  </button>
+              )}
+
+              {/* Buscador + Contador de seleccionados */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={integranteSearch}
+                    onChange={(e) => {
+                      setIntegranteSearch(e.target.value);
+                      setIntegrantePage(1);
+                    }}
+                    placeholder="Buscar por nombre completo o nombre de usuario..."
+                    className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                  {integranteSearch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIntegranteSearch('');
+                        setIntegrantePage(1);
+                      }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-2 shrink-0">
+                  <span className="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold">
+                    {selectedIntegranteIds.length} seleccionado(s)
+                  </span>
+                  {selectedIntegranteIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedIntegranteIds([])}
+                      className="text-xs font-semibold text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                    >
+                      Limpiar
+                    </button>
+                  )}
                 </div>
               </div>
-            ) : (
-              <form onSubmit={handleAddIntegrante} className="p-5 space-y-4">
-                {integranteError && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
-                    {integranteError}
-                  </div>
-                )}
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Seleccionar usuario *</label>
-                  <select
-                    value={selectedUsuarioId}
-                    onChange={(e) => setSelectedUsuarioId(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
-                    required
-                  >
-                    <option value="">-- Elige un usuario --</option>
-                    {usuariosDisponibles
-                      .filter((u) => u.areaActualId !== selectedArea.id)
-                      .map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.nombre} (@{u.userName})
-                          {u.areaActualNombre ? ` — Actual: ${u.areaActualNombre}` : ' — Sin área'}
-                        </option>
-                      ))}
-                  </select>
-                  <p className="text-[11px] text-slate-500 mt-1.5">
-                    Un usuario no puede pertenecer a dos áreas al mismo tiempo. Si ya está en otra área, se te pedirá confirmación para moverlo.
+              {/* Tabla de usuarios disponibles */}
+              {availableUnassignedUsers.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-1">
+                  <Users className="w-8 h-8 text-slate-300 mx-auto" />
+                  <p className="text-sm font-semibold text-slate-700">No hay usuarios disponibles</p>
+                  <p className="text-xs text-slate-500">
+                    Todos los usuarios activos ya pertenecen a un área. Para mover a alguien, primero retíralo de su área actual.
                   </p>
                 </div>
-
-                <div className="flex justify-end space-x-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowIntegranteModal(false)}
-                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={addingIntegrante}
-                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold text-xs rounded-lg shadow-xs disabled:opacity-50"
-                  >
-                    {addingIntegrante ? 'Agregando...' : 'Agregar Integrante'}
-                  </button>
+              ) : filteredModalUsers.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 text-xs text-slate-500">
+                  No se encontraron usuarios disponibles que coincidan con "{integranteSearch}".
                 </div>
-              </form>
-            )}
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-100 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-600 font-bold">
+                        <th className="py-3 px-4 w-10">
+                          <input
+                            type="checkbox"
+                            checked={
+                              paginatedModalUsers.length > 0 &&
+                              paginatedModalUsers.every((u) => selectedIntegranteIds.includes(u.id))
+                            }
+                            onChange={handleToggleSelectAllVisible}
+                            aria-label="Seleccionar todos en esta página"
+                            className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                          />
+                        </th>
+                        <th className="py-3 px-4">Nombre completo</th>
+                        <th className="py-3 px-4">Nombre de usuario</th>
+                        <th className="py-3 px-4">Rol de acceso</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {paginatedModalUsers.map((u) => {
+                        const isChecked = selectedIntegranteIds.includes(u.id);
+                        return (
+                          <tr
+                            key={u.id}
+                            onClick={() => handleToggleIntegranteSelection(u.id)}
+                            className={`transition cursor-pointer ${
+                              isChecked ? 'bg-amber-50/70 hover:bg-amber-50' : 'hover:bg-slate-50'
+                            }`}
+                          >
+                            <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => handleToggleIntegranteSelection(u.id)}
+                                className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                              />
+                            </td>
+                            <td className="py-3 px-4 font-semibold text-slate-800">{u.nombre}</td>
+                            <td className="py-3 px-4 font-mono text-slate-600">@{u.userName}</td>
+                            <td className="py-3 px-4">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                {u.rol || 'Sin rol'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Paginación del modal */}
+              {filteredModalUsers.length > INTEGRANTES_PAGE_SIZE && (
+                <div className="flex items-center justify-between text-xs text-slate-600 pt-1">
+                  <span>
+                    Mostrando {(safeIntegrantePage - 1) * INTEGRANTES_PAGE_SIZE + 1} -{' '}
+                    {Math.min(safeIntegrantePage * INTEGRANTES_PAGE_SIZE, filteredModalUsers.length)} de{' '}
+                    {filteredModalUsers.length} disponibles
+                  </span>
+                  <div className="flex items-center space-x-1.5">
+                    <button
+                      type="button"
+                      disabled={safeIntegrantePage <= 1}
+                      onClick={() => setIntegrantePage((p) => Math.max(1, p - 1))}
+                      className="px-2.5 py-1 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 flex items-center space-x-1 cursor-pointer"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <span>Anterior</span>
+                    </button>
+                    <span className="px-2 font-bold">
+                      {safeIntegrantePage} / {totalIntegrantePages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={safeIntegrantePage >= totalIntegrantePages}
+                      onClick={() => setIntegrantePage((p) => Math.min(totalIntegrantePages, p + 1))}
+                      className="px-2.5 py-1 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 flex items-center space-x-1 cursor-pointer"
+                    >
+                      <span>Siguiente</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end space-x-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowIntegranteModal(false)}
+                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold hover:bg-white transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmAddIntegrantes}
+                disabled={addingIntegrante || selectedIntegranteIds.length === 0}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold text-xs rounded-xl shadow-xs disabled:opacity-50 transition cursor-pointer"
+              >
+                {addingIntegrante
+                  ? 'Agregando...'
+                  : `Agregar integrantes seleccionados (${selectedIntegranteIds.length})`}
+              </button>
+            </div>
           </div>
         </div>
       )}

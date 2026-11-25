@@ -265,7 +265,7 @@ public class AreasController : ControllerBase
         if (usuario == null || !usuario.Activo)
             return BadRequest(new { message = "El usuario seleccionado no existe o no está activo." });
 
-        // Verificar si ya pertenece a otra área
+        // Verificar si ya pertenece a otra área (no se permite pertenecer a varias áreas simultáneamente)
         var existingAssignment = await _context.AreaIntegrantes
             .Include(ai => ai.Area)
             .FirstOrDefaultAsync(ai => ai.UsuarioId == request.UsuarioId);
@@ -275,24 +275,10 @@ public class AreasController : ControllerBase
             if (existingAssignment.AreaId == id)
                 return BadRequest(new { message = $"El usuario '{usuario.Nombre}' ya es integrante de esta área." });
 
-            if (!request.ForzarCambio)
-                return Conflict(new
-                {
-                    message = $"El usuario '{usuario.Nombre}' ya pertenece al área '{existingAssignment.Area?.Nombre}'. ¿Deseas moverlo a esta área?",
-                    areaActual = existingAssignment.Area?.Nombre,
-                    requiereForzar = true
-                });
-
-            // Forzar cambio: remover de la otra área
-            _context.AreaIntegrantes.Remove(existingAssignment);
-            _context.Auditoria.Add(new Auditoria
+            return Conflict(new
             {
-                UsuarioNombre = userName,
-                Accion = "MOVER_INTEGRANTE",
-                Entidad = "AreaIntegrante",
-                EntidadId = usuario.Id.ToString(),
-                FechaHora = DateTime.UtcNow,
-                Descripcion = $"Movimiento del usuario '{usuario.Nombre}' del área '{existingAssignment.Area?.Nombre}' al área '{area.Nombre}'"
+                message = $"El usuario '{usuario.Nombre}' ya pertenece al área '{existingAssignment.Area?.Nombre}'. Primero debe ser retirado de su área actual.",
+                areaActual = existingAssignment.Area?.Nombre
             });
         }
 
@@ -316,6 +302,78 @@ public class AreasController : ControllerBase
 
         await _context.SaveChangesAsync();
         return Ok(new { message = $"'{usuario.Nombre}' agregado al área '{area.Nombre}'." });
+    }
+
+    // POST: api/areas/{id}/integrantes/batch
+    [HttpPost("{id}/integrantes/batch")]
+    public async Task<IActionResult> AddIntegrantesBatch(int id, [FromBody] AddIntegrantesBatchRequest request)
+    {
+        var userName = GetUserName();
+        var userId = GetUserId();
+
+        var area = await _context.Areas.Include(a => a.Integrantes).FirstOrDefaultAsync(a => a.Id == id);
+        if (area == null) return NotFound(new { message = "Área no encontrada." });
+        if (!area.Activa) return BadRequest(new { message = "No se pueden agregar integrantes a un área desactivada." });
+
+        bool canManage = IsAdmin();
+        if (!canManage && area.CoordinadorId == userId)
+        {
+            canManage = await _authService.HasPermissionAsync(userName, "areas_integrantes");
+        }
+        if (!canManage) return Forbid();
+
+        var distinctIds = (request.UsuarioIds ?? new List<int>()).Distinct().ToList();
+        if (distinctIds.Count == 0)
+            return BadRequest(new { message = "Debes seleccionar al menos un usuario." });
+
+        var usuarios = await _context.Users
+            .Where(u => distinctIds.Contains(u.Id) && u.Activo)
+            .ToListAsync();
+
+        if (usuarios.Count != distinctIds.Count)
+            return BadRequest(new { message = "Uno o más usuarios seleccionados no existen o no están activos." });
+
+        var existingAssignments = await _context.AreaIntegrantes
+            .Include(ai => ai.Area)
+            .Include(ai => ai.Usuario)
+            .Where(ai => distinctIds.Contains(ai.UsuarioId))
+            .ToListAsync();
+
+        if (existingAssignments.Count > 0)
+        {
+            var first = existingAssignments[0];
+            var nombreUsuario = first.Usuario?.Nombre ?? $"ID {first.UsuarioId}";
+            if (first.AreaId == id)
+                return BadRequest(new { message = $"El usuario '{nombreUsuario}' ya es integrante de esta área." });
+
+            return Conflict(new
+            {
+                message = $"El usuario '{nombreUsuario}' ya pertenece al área '{first.Area?.Nombre}'. Primero debe ser retirado de su área actual."
+            });
+        }
+
+        foreach (var u in usuarios)
+        {
+            _context.AreaIntegrantes.Add(new AreaIntegrante
+            {
+                AreaId = id,
+                UsuarioId = u.Id,
+                FechaAsignacion = DateTime.UtcNow
+            });
+
+            _context.Auditoria.Add(new Auditoria
+            {
+                UsuarioNombre = userName,
+                Accion = "AGREGAR_INTEGRANTE",
+                Entidad = "AreaIntegrante",
+                EntidadId = $"{id}-{u.Id}",
+                FechaHora = DateTime.UtcNow,
+                Descripcion = $"Agregar usuario '{u.Nombre}' al área '{area.Nombre}'"
+            });
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(new { message = $"{usuarios.Count} integrante(s) agregado(s) al área '{area.Nombre}'.", count = usuarios.Count });
     }
 
     // DELETE: api/areas/{areaId}/integrantes/{userId}
@@ -382,7 +440,7 @@ public class AreasController : ControllerBase
 
     // GET: api/areas/usuarios-disponibles
     [HttpGet("usuarios-disponibles")]
-    public async Task<IActionResult> GetUsuariosDisponibles()
+    public async Task<IActionResult> GetUsuariosDisponibles([FromQuery] bool soloSinArea = false)
     {
         var userName = GetUserName();
         var userId = GetUserId();
@@ -416,15 +474,17 @@ public class AreasController : ControllerBase
             .Include(ai => ai.Area)
             .ToDictionaryAsync(ai => ai.UsuarioId, ai => new { ai.AreaId, AreaNombre = ai.Area != null ? ai.Area.Nombre : "" });
 
-        var result = users.Select(u => new
-        {
-            u.Id,
-            u.Nombre,
-            u.UserName,
-            u.Rol,
-            AreaActualId = asignaciones.ContainsKey(u.Id) ? (int?)asignaciones[u.Id].AreaId : null,
-            AreaActualNombre = asignaciones.ContainsKey(u.Id) ? asignaciones[u.Id].AreaNombre : null
-        });
+        var result = users
+            .Where(u => !soloSinArea || !asignaciones.ContainsKey(u.Id))
+            .Select(u => new
+            {
+                u.Id,
+                u.Nombre,
+                u.UserName,
+                u.Rol,
+                AreaActualId = asignaciones.ContainsKey(u.Id) ? (int?)asignaciones[u.Id].AreaId : null,
+                AreaActualNombre = asignaciones.ContainsKey(u.Id) ? asignaciones[u.Id].AreaNombre : null
+            });
 
         return Ok(result);
     }

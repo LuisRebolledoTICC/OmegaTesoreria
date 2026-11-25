@@ -14,6 +14,7 @@ interface AuthContextType {
   token: string | null;
   login: (u: string, p: string) => Promise<void>;
   logout: () => void;
+  updateSession: (res: { id?: number; token: string; userName: string; nombre: string; rol: string; modulosPermitidos?: string[] }) => void;
   isAdmin: boolean;
   isTesorero: boolean;
   canOperate: boolean;
@@ -54,6 +55,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('omega_token');
   };
 
+  const updateSession = (res: { id?: number; token: string; userName: string; nombre: string; rol: string; modulosPermitidos?: string[] }) => {
+    const authUser: AuthUser = {
+      id: res.id,
+      userName: res.userName,
+      nombre: res.nombre,
+      rol: res.rol,
+      modulosPermitidos: res.modulosPermitidos,
+    };
+    setUser(authUser);
+    setToken(res.token);
+    localStorage.setItem('omega_user', JSON.stringify(authUser));
+    localStorage.setItem('omega_token', res.token);
+  };
+
   const isAdmin = user?.rol === 'Administrador';
   const isTesorero = user?.rol === 'Tesorero' || isAdmin;
   const canOperate = isAdmin || user?.rol === 'Tesorero' || (user?.modulosPermitidos?.includes('conteo') ?? false);
@@ -72,7 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAdmin, isTesorero, canOperate, canAccessModule }}>
+    <AuthContext.Provider value={{ user, token, login, logout, updateSession, isAdmin, isTesorero, canOperate, canAccessModule }}>
       {children}
     </AuthContext.Provider>
   );

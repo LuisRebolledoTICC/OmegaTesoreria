@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Users,
   UserPlus,
@@ -15,10 +15,19 @@ import {
   Trash2,
   CheckSquare,
   Square,
-  Check
+  Check,
+  Search,
+  Filter,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ChevronLeft,
+  ChevronRight,
+  X
 } from 'lucide-react';
 import { User, RolPersonalizado } from '../types';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const MODULOS_DISPONIBLES = [
   { id: 'dashboard', nombre: 'Dashboard General', descripcion: 'Panel general con balances y gráficos' },
@@ -47,11 +56,23 @@ const MODULOS_DISPONIBLES = [
 ];
 
 export const UsuariosView: React.FC = () => {
+  const { user: currentUser } = useAuth();
   const [activeSubTab, setActiveSubTab] = useState<'usuarios' | 'roles'>('usuarios');
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<RolPersonalizado[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [actionToast, setActionToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Search, sort, Excel role filter, pagination
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedRolesFilter, setSelectedRolesFilter] = useState<string[]>([]);
+  const [showRoleFilterMenu, setShowRoleFilterMenu] = useState(false);
+  const roleFilterRef = useRef<HTMLDivElement>(null);
+  const [sortField, setSortField] = useState<'nombre' | 'userName' | 'rol' | 'activo' | 'fechaCreacion'>('nombre');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Form states - Crear usuario
   const [userName, setUserName] = useState('');
@@ -72,10 +93,16 @@ export const UsuariosView: React.FC = () => {
 
   // States - Editar Usuario
   const [userForEdit, setUserForEdit] = useState<User | null>(null);
+  const [editUserName, setEditUserName] = useState('');
   const [editNombre, setEditNombre] = useState('');
   const [editRol, setEditRol] = useState<string>('Tesorero');
   const [editError, setEditError] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+
+  // States - Eliminar Usuario
+  const [userForDelete, setUserForDelete] = useState<User | null>(null);
+  const [deletingUser, setDeletingUser] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // States - Roles y Permisos
   const [showRolModal, setShowRolModal] = useState(false);
@@ -108,6 +135,93 @@ export const UsuariosView: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (roleFilterRef.current && !roleFilterRef.current.contains(event.target as Node)) {
+        setShowRoleFilterMenu(false);
+      }
+    };
+    if (showRoleFilterMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showRoleFilterMenu]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedRolesFilter, pageSize]);
+
+  const availableRoleNames = useMemo(() => {
+    const set = new Set<string>();
+    roles.forEach((r) => {
+      if (r.nombre) set.add(r.nombre);
+    });
+    users.forEach((u) => {
+      if (u.rol) set.add(u.rol);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+  }, [roles, users]);
+
+  const filteredAndSortedUsers = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    const filtered = users.filter((u) => {
+      if (selectedRolesFilter.length > 0 && !selectedRolesFilter.includes(u.rol)) {
+        return false;
+      }
+      if (!term) return true;
+      return (
+        u.nombre.toLowerCase().includes(term) ||
+        u.userName.toLowerCase().includes(term) ||
+        u.rol.toLowerCase().includes(term)
+      );
+    });
+
+    const sorted = [...filtered].sort((a, b) => {
+      let cmp = 0;
+      if (sortField === 'nombre') {
+        cmp = a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' });
+        if (cmp === 0) cmp = a.userName.localeCompare(b.userName, 'es', { sensitivity: 'base' });
+      } else if (sortField === 'userName') {
+        cmp = a.userName.localeCompare(b.userName, 'es', { sensitivity: 'base' });
+      } else if (sortField === 'rol') {
+        cmp = a.rol.localeCompare(b.rol, 'es', { sensitivity: 'base' });
+      } else if (sortField === 'activo') {
+        cmp = (a.activo === b.activo) ? 0 : a.activo ? -1 : 1;
+      } else if (sortField === 'fechaCreacion') {
+        cmp = new Date(a.fechaCreacion).getTime() - new Date(b.fechaCreacion).getTime();
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+
+    return sorted;
+  }, [users, searchTerm, selectedRolesFilter, sortField, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedUsers.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedUsers = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filteredAndSortedUsers.slice(start, start + pageSize);
+  }, [filteredAndSortedUsers, safePage, pageSize]);
+
+  const handleSort = (field: 'nombre' | 'userName' | 'rol' | 'activo' | 'fechaCreacion') => {
+    if (sortField === field) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const toggleRoleInFilter = (roleName: string) => {
+    setSelectedRolesFilter((prev) =>
+      prev.includes(roleName) ? prev.filter((r) => r !== roleName) : [...prev, roleName]
+    );
+  };
+
+  const isCurrentUser = (u: User) =>
+    (currentUser?.id && u.id === currentUser.id) ||
+    (currentUser?.userName && u.userName.toLowerCase() === currentUser.userName.toLowerCase());
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,6 +277,7 @@ export const UsuariosView: React.FC = () => {
     try {
       await api.updateUser(userForPassword.id, {
         nombre: userForPassword.nombre,
+        userName: userForPassword.userName,
         rol: userForPassword.rol,
         activo: userForPassword.activo,
         newPassword: newPassword.trim(),
@@ -181,6 +296,7 @@ export const UsuariosView: React.FC = () => {
 
   const handleOpenEditModal = (u: User) => {
     setUserForEdit(u);
+    setEditUserName(u.userName);
     setEditNombre(u.nombre);
     setEditRol(u.rol);
     setEditError(null);
@@ -189,6 +305,11 @@ export const UsuariosView: React.FC = () => {
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userForEdit) return;
+
+    if (!editUserName.trim()) {
+      setEditError('El nombre de usuario es requerido.');
+      return;
+    }
 
     if (!editNombre.trim()) {
       setEditError('El nombre completo es requerido.');
@@ -199,16 +320,44 @@ export const UsuariosView: React.FC = () => {
     setEditError(null);
     try {
       await api.updateUser(userForEdit.id, {
+        userName: editUserName.trim(),
         nombre: editNombre.trim(),
         rol: editRol,
         activo: userForEdit.activo,
       });
       setUserForEdit(null);
+      setActionToast({ type: 'success', text: `Usuario "${editNombre.trim()}" actualizado correctamente.` });
+      setTimeout(() => setActionToast(null), 3500);
       loadData();
     } catch (err: any) {
       setEditError(err.message || 'Error al actualizar usuario.');
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const handleOpenDeleteModal = (u: User) => {
+    setUserForDelete(u);
+    setDeleteError(null);
+  };
+
+  const handleConfirmDeleteUser = async () => {
+    if (!userForDelete) return;
+    setDeletingUser(true);
+    setDeleteError(null);
+    try {
+      const res = await api.deleteUser(userForDelete.id);
+      setActionToast({
+        type: 'success',
+        text: res.message || `Cuenta "${userForDelete.userName}" eliminada permanentemente.`,
+      });
+      setTimeout(() => setActionToast(null), 4000);
+      setUserForDelete(null);
+      loadData();
+    } catch (err: any) {
+      setDeleteError(err.message || 'No se pudo eliminar el usuario.');
+    } finally {
+      setDeletingUser(false);
     }
   };
 
@@ -333,16 +482,130 @@ export const UsuariosView: React.FC = () => {
       {/* SUBTAB 1: USUARIOS */}
       {activeSubTab === 'usuarios' && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-sm font-bold text-slate-700">Cuentas Registradas en el Sistema</h3>
-            <button
-              onClick={() => setShowModal(true)}
-              className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5"
+          {actionToast && (
+            <div
+              className={`p-3.5 rounded-xl border text-xs flex items-center justify-between ${
+                actionToast.type === 'success'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : 'bg-rose-50 border-rose-200 text-rose-800'
+              }`}
             >
-              <UserPlus className="w-4 h-4" />
-              <span>Nuevo Usuario</span>
-            </button>
+              <div className="flex items-center space-x-2">
+                {actionToast.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                )}
+                <span>{actionToast.text}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActionToast(null)}
+                className="font-bold px-2 cursor-pointer"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-700">Cuentas Registradas en el Sistema</h3>
+              <p className="text-[11px] text-slate-500">
+                Mostrando {filteredAndSortedUsers.length} de {users.length} cuenta(s)
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 sm:flex-initial sm:w-64">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Buscar por nombre, usuario o rol..."
+                  className="w-full pl-9 pr-8 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    title="Limpiar búsqueda"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowModal(true)}
+                className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5 shrink-0 cursor-pointer"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Nuevo Usuario</span>
+              </button>
+            </div>
           </div>
+
+          {/* Barra de filtro activo / filtro móvil */}
+          {(selectedRolesFilter.length > 0 || availableRoleNames.length > 0) && (
+            <div className="flex flex-wrap items-center justify-between gap-2 md:hidden bg-white p-3 rounded-xl border border-slate-200">
+              <span className="text-[11px] font-bold text-slate-600 flex items-center space-x-1">
+                <Filter className="w-3.5 h-3.5 text-amber-600" />
+                <span>Filtrar por rol:</span>
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {availableRoleNames.map((roleName) => {
+                  const selected = selectedRolesFilter.includes(roleName);
+                  return (
+                    <button
+                      key={roleName}
+                      type="button"
+                      onClick={() => toggleRoleInFilter(roleName)}
+                      className={`px-2 py-1 rounded-lg text-[11px] font-semibold border transition ${
+                        selected
+                          ? 'bg-amber-500 text-slate-950 border-amber-600'
+                          : 'bg-slate-50 text-slate-600 border-slate-200'
+                      }`}
+                    >
+                      {roleName}
+                    </button>
+                  );
+                })}
+                {selectedRolesFilter.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRolesFilter([])}
+                    className="px-2 py-1 rounded-lg text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {selectedRolesFilter.length > 0 && (
+            <div className="hidden md:flex items-center justify-between bg-amber-50 border border-amber-200 px-3.5 py-2 rounded-xl text-xs text-amber-900">
+              <div className="flex items-center flex-wrap gap-1.5">
+                <Filter className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span className="font-semibold">Roles filtrados:</span>
+                {selectedRolesFilter.map((r) => (
+                  <span key={r} className="px-2 py-0.5 bg-white border border-amber-300 rounded-md font-bold text-[11px]">
+                    {r}
+                  </span>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedRolesFilter([])}
+                className="text-xs font-bold text-amber-800 hover:text-amber-950 underline cursor-pointer"
+              >
+                Limpiar filtro de roles
+              </button>
+            </div>
+          )}
 
           {/* Vista Móvil en Tarjetas (< md) */}
           <div className="md:hidden space-y-3">
@@ -350,8 +613,12 @@ export const UsuariosView: React.FC = () => {
               <div className="p-6 text-center text-xs text-slate-500 bg-white rounded-xl border border-slate-200">
                 Cargando usuarios...
               </div>
+            ) : paginatedUsers.length === 0 ? (
+              <div className="p-6 text-center text-xs text-slate-500 bg-white rounded-xl border border-slate-200">
+                No se encontraron usuarios con los filtros aplicados.
+              </div>
             ) : (
-              users.map((u) => (
+              paginatedUsers.map((u) => (
                 <div key={u.id} className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center space-x-3 min-w-0">
@@ -409,15 +676,25 @@ export const UsuariosView: React.FC = () => {
                       <Pencil className="w-3.5 h-3.5" />
                       <span>Editar</span>
                     </button>
-                    {u.userName.toLowerCase() !== 'admin' && (
+                    {!isCurrentUser(u) && u.userName.toLowerCase() !== 'admin' && (
                       <button
                         type="button"
                         onClick={() => handleToggleStatus(u.id)}
-                        className={`w-full py-2 px-3 rounded-lg text-xs font-bold transition ${
+                        className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition ${
                           u.activo ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                         }`}
                       >
-                        {u.activo ? 'Desactivar Cuenta' : 'Activar Cuenta'}
+                        {u.activo ? 'Desactivar' : 'Activar'}
+                      </button>
+                    )}
+                    {!isCurrentUser(u) && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDeleteModal(u)}
+                        className="w-full py-2 px-3 rounded-lg text-xs font-bold bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition flex items-center justify-center space-x-1.5"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Eliminar Cuenta</span>
                       </button>
                     )}
                   </div>
@@ -427,17 +704,146 @@ export const UsuariosView: React.FC = () => {
           </div>
 
           {/* Vista Desktop/Tablet en Tabla (>= md) */}
-          <div className="hidden md:block bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+          <div className="hidden md:block bg-white rounded-xl border border-slate-200 shadow-xs overflow-visible">
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left whitespace-nowrap">
               <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider border-b border-slate-200">
                 <tr>
                   <th className="p-3">ID</th>
-                  <th className="p-3">Usuario</th>
-                  <th className="p-3">Nombre Completo</th>
-                  <th className="p-3">Rol de Acceso</th>
-                  <th className="p-3">Estado</th>
-                  <th className="p-3">Fecha de Creación</th>
+                  <th className="p-3">
+                    <button
+                      type="button"
+                      onClick={() => handleSort('userName')}
+                      className="inline-flex items-center space-x-1 hover:text-slate-950 cursor-pointer"
+                    >
+                      <span>Usuario</span>
+                      {sortField === 'userName' ? (
+                        sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-amber-600" /> : <ArrowDown className="w-3.5 h-3.5 text-amber-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+                      )}
+                    </button>
+                  </th>
+                  <th className="p-3">
+                    <button
+                      type="button"
+                      onClick={() => handleSort('nombre')}
+                      className="inline-flex items-center space-x-1 hover:text-slate-950 cursor-pointer"
+                    >
+                      <span>Nombre Completo</span>
+                      {sortField === 'nombre' ? (
+                        sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-amber-600" /> : <ArrowDown className="w-3.5 h-3.5 text-amber-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+                      )}
+                    </button>
+                  </th>
+                  <th className="p-3 relative">
+                    <div className="inline-flex items-center space-x-1.5" ref={roleFilterRef}>
+                      <button
+                        type="button"
+                        onClick={() => handleSort('rol')}
+                        className="inline-flex items-center space-x-1 hover:text-slate-950 cursor-pointer"
+                      >
+                        <span>Rol de Acceso</span>
+                        {sortField === 'rol' ? (
+                          sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-amber-600" /> : <ArrowDown className="w-3.5 h-3.5 text-amber-600" />
+                        ) : (
+                          <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowRoleFilterMenu((prev) => !prev)}
+                        title="Filtrar por rol de acceso"
+                        className={`p-1 rounded-md border transition cursor-pointer ${
+                          selectedRolesFilter.length > 0
+                            ? 'bg-amber-500 text-slate-950 border-amber-600'
+                            : 'bg-white text-slate-500 border-slate-300 hover:text-slate-800'
+                        }`}
+                      >
+                        <Filter className="w-3 h-3" />
+                      </button>
+
+                      {showRoleFilterMenu && (
+                        <div className="absolute left-0 top-full mt-1 w-60 bg-white border border-slate-200 rounded-xl shadow-xl z-40 p-2.5 normal-case font-normal">
+                          <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+                            <span className="text-[11px] font-bold text-slate-700 uppercase">Filtrar por Rol</span>
+                            <button
+                              type="button"
+                              onClick={() => setShowRoleFilterMenu(false)}
+                              className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <div className="max-h-48 overflow-y-auto space-y-1">
+                            {availableRoleNames.map((roleName) => {
+                              const checked = selectedRolesFilter.includes(roleName);
+                              return (
+                                <label
+                                  key={roleName}
+                                  className="flex items-center space-x-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-xs text-slate-700"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleRoleInFilter(roleName)}
+                                    className="rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                                  />
+                                  <span className="truncate font-medium">{roleName}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                          <div className="flex items-center justify-between pt-2 mt-2 border-t border-slate-100 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedRolesFilter(availableRoleNames)}
+                              className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                            >
+                              Seleccionar todos
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedRolesFilter([])}
+                              className="text-[11px] font-semibold text-rose-600 hover:text-rose-800 cursor-pointer"
+                            >
+                              Limpiar filtro
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </th>
+                  <th className="p-3">
+                    <button
+                      type="button"
+                      onClick={() => handleSort('activo')}
+                      className="inline-flex items-center space-x-1 hover:text-slate-950 cursor-pointer"
+                    >
+                      <span>Estado</span>
+                      {sortField === 'activo' ? (
+                        sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-amber-600" /> : <ArrowDown className="w-3.5 h-3.5 text-amber-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+                      )}
+                    </button>
+                  </th>
+                  <th className="p-3">
+                    <button
+                      type="button"
+                      onClick={() => handleSort('fechaCreacion')}
+                      className="inline-flex items-center space-x-1 hover:text-slate-950 cursor-pointer"
+                    >
+                      <span>Fecha de Creación</span>
+                      {sortField === 'fechaCreacion' ? (
+                        sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-amber-600" /> : <ArrowDown className="w-3.5 h-3.5 text-amber-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+                      )}
+                    </button>
+                  </th>
                   <th className="p-3">Último Acceso</th>
                   <th className="p-3 text-center">Acciones</th>
                 </tr>
@@ -449,8 +855,14 @@ export const UsuariosView: React.FC = () => {
                       Cargando usuarios...
                     </td>
                   </tr>
+                ) : paginatedUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="p-6 text-center text-slate-500">
+                      No se encontraron usuarios con los filtros aplicados.
+                    </td>
+                  </tr>
                 ) : (
-                  users.map((u) => (
+                  paginatedUsers.map((u) => (
                     <tr key={u.id} className="hover:bg-slate-50">
                       <td className="p-3 font-mono text-slate-500">#{u.id}</td>
                       <td className="p-3 font-bold text-slate-900">{u.userName}</td>
@@ -473,8 +885,8 @@ export const UsuariosView: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleOpenPasswordModal(u)}
-                            className="p-1.5 text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition font-medium flex items-center space-x-1 text-[11px]"
-                            title="Cambiar contraseña de este usuario"
+                            className="p-1.5 text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition font-medium flex items-center space-x-1 text-[11px] cursor-pointer"
+                            title="Restablecer o cambiar contraseña de este usuario"
                           >
                             <KeyRound className="w-3.5 h-3.5" />
                             <span>Contraseña</span>
@@ -482,21 +894,32 @@ export const UsuariosView: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleOpenEditModal(u)}
-                            className="p-1.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition font-medium flex items-center space-x-1 text-[11px]"
+                            className="p-1.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition font-medium flex items-center space-x-1 text-[11px] cursor-pointer"
                             title="Editar datos del usuario"
                           >
                             <Pencil className="w-3.5 h-3.5" />
                             <span>Editar</span>
                           </button>
-                          {u.userName.toLowerCase() !== 'admin' && (
+                          {!isCurrentUser(u) && u.userName.toLowerCase() !== 'admin' && (
                             <button
                               type="button"
                               onClick={() => handleToggleStatus(u.id)}
-                              className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${
+                              className={`px-2 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
                                 u.activo ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                               }`}
                             >
                               {u.activo ? 'Desactivar' : 'Activar'}
+                            </button>
+                          )}
+                          {!isCurrentUser(u) && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDeleteModal(u)}
+                              className="p-1.5 text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition font-medium flex items-center space-x-1 text-[11px] cursor-pointer"
+                              title="Eliminar usuario permanentemente"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Eliminar</span>
                             </button>
                           )}
                         </div>
@@ -508,6 +931,55 @@ export const UsuariosView: React.FC = () => {
             </table>
             </div>
           </div>
+
+          {/* Paginación */}
+          {!loading && filteredAndSortedUsers.length > 0 && (
+            <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center space-x-2 text-slate-600">
+                <span>
+                  Mostrando{' '}
+                  <strong>{(safePage - 1) * pageSize + 1}</strong>
+                  {' - '}
+                  <strong>{Math.min(safePage * pageSize, filteredAndSortedUsers.length)}</strong>
+                  {' de '}
+                  <strong>{filteredAndSortedUsers.length}</strong> usuario(s)
+                </span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  className="px-2 py-1 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold"
+                >
+                  <option value={10}>10 / pág</option>
+                  <option value={20}>20 / pág</option>
+                  <option value={50}>50 / pág</option>
+                </select>
+              </div>
+
+              <div className="flex items-center space-x-1.5">
+                <button
+                  type="button"
+                  disabled={safePage <= 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-40 flex items-center space-x-1 cursor-pointer"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Anterior</span>
+                </button>
+                <span className="px-2.5 py-1 font-bold text-slate-700">
+                  Página {safePage} de {totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={safePage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-40 flex items-center space-x-1 cursor-pointer"
+                >
+                  <span>Siguiente</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -780,7 +1252,7 @@ export const UsuariosView: React.FC = () => {
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
             <h3 className="text-base font-bold text-slate-900 mb-1">Editar Datos del Usuario</h3>
             <p className="text-xs text-slate-500 mb-4">
-              Modifica el nombre y rol para <strong className="text-slate-800">{userForEdit.userName}</strong>.
+              Modifica el usuario, nombre y rol para <strong className="text-slate-800">@{userForEdit.userName}</strong>.
             </p>
 
             {editError && (
@@ -791,6 +1263,17 @@ export const UsuariosView: React.FC = () => {
             )}
 
             <form onSubmit={handleSaveEdit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Usuario (Login):</label>
+                <input
+                  type="text"
+                  required
+                  value={editUserName}
+                  onChange={(e) => setEditUserName(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre Completo:</label>
                 <input
@@ -821,19 +1304,74 @@ export const UsuariosView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setUserForEdit(null)}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 transition"
+                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 transition cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={savingEdit}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs transition"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs transition cursor-pointer"
                 >
                   {savingEdit ? 'Guardando...' : 'Guardar Cambios'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirmar Eliminación Permanente de Usuario */}
+      {userForDelete && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-red-200">
+            <div className="flex items-center space-x-3 mb-3">
+              <div className="p-2.5 bg-red-100 text-red-700 rounded-xl shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Eliminar Cuenta Permanentemente</h3>
+                <p className="text-xs text-red-600 font-semibold">Esta acción es permanente y no se puede deshacer.</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 space-y-1.5 mb-4">
+              <p>
+                Estás a punto de eliminar definitivamente la cuenta de:
+              </p>
+              <p className="font-bold text-slate-900 text-sm">
+                {userForDelete.nombre} <span className="font-mono text-xs text-slate-500">(@{userForDelete.userName})</span>
+              </p>
+              <p className="text-[11px] text-slate-500 pt-1">
+                Los registros históricos de inventarios, movimientos y auditorías realizados por este usuario se conservarán intactos.
+              </p>
+            </div>
+
+            {deleteError && (
+              <div className="p-3 mb-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setUserForDelete(null)}
+                disabled={deletingUser}
+                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteUser}
+                disabled={deletingUser}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-xs transition disabled:opacity-50 cursor-pointer"
+              >
+                {deletingUser ? 'Eliminando...' : 'Sí, eliminar permanentemente'}
+              </button>
+            </div>
           </div>
         </div>
       )}

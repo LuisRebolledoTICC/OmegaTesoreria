@@ -81,13 +81,35 @@ export const api = {
     return handleResponse<User>(res);
   },
 
-  async updateUser(id: number, data: { nombre: string; rol: string; activo: boolean; newPassword?: string }): Promise<void> {
+  async updateUser(id: number, data: { nombre: string; rol: string; activo: boolean; newPassword?: string; userName?: string }): Promise<void> {
     const res = await fetch(`${API_BASE_URL}/auth/users/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(data),
     });
     await handleResponse(res);
+  },
+
+  async deleteUser(id: number): Promise<{ message: string }> {
+    const res = await fetch(`${API_BASE_URL}/auth/users/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    return handleResponse<{ message: string }>(res);
+  },
+
+  async getPerfil(): Promise<User> {
+    const res = await fetch(`${API_BASE_URL}/auth/perfil`, { headers: getHeaders() });
+    return handleResponse<User>(res);
+  },
+
+  async updatePerfil(data: { nombre: string; userName: string; passwordActual?: string; nuevaPassword?: string }): Promise<LoginResponse> {
+    const res = await fetch(`${API_BASE_URL}/auth/perfil`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<LoginResponse>(res);
   },
 
   async toggleUserStatus(id: number): Promise<void> {
@@ -575,9 +597,19 @@ export const api = {
     return handleResponse<MiAreaInfo>(res);
   },
 
-  async getUsuariosDisponiblesArea(): Promise<UsuarioDisponible[]> {
-    const res = await fetch(`${API_BASE_URL}/areas/usuarios-disponibles`, { headers: getHeaders() });
+  async getUsuariosDisponiblesArea(soloSinArea = false): Promise<UsuarioDisponible[]> {
+    const query = soloSinArea ? '?soloSinArea=true' : '';
+    const res = await fetch(`${API_BASE_URL}/areas/usuarios-disponibles${query}`, { headers: getHeaders() });
     return handleResponse<UsuarioDisponible[]>(res);
+  },
+
+  async addIntegrantesAreaBatch(areaId: number, usuarioIds: number[]): Promise<{ message: string; count: number }> {
+    const res = await fetch(`${API_BASE_URL}/areas/${areaId}/integrantes/batch`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ usuarioIds }),
+    });
+    return handleResponse<{ message: string; count: number }>(res);
   },
 
   // --- INVENTARIOS ---

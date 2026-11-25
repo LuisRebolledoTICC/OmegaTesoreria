@@ -10,33 +10,20 @@ using OmegaTesoreria.Api.Models;
 namespace OmegaTesoreria.Api.Services;
 
 public interface IAuthService
-    {
-        Task<LoginResponse?> LoginAsync(LoginRequest request);
-        Task<List<UserDto>> GetUsersAsync();
-        Task<UserDto?> CreateUserAsync(CreateUserRequest request, string currentUserName);
-        Task<bool> UpdateUserAsync(int id, UpdateUserRequest request, string currentUserName);
-        Task<bool> ToggleUserStatusAsync(int id, string currentUserName);
-        Task<List<RolPersonalizadoDto>> GetRolesAsync();
-        Task<RolPersonalizadoDto?> CreateRolAsync(CreateOrUpdateRolRequest request, string currentUserName);
-        Task<bool> UpdateRolAsync(int id, CreateOrUpdateRolRequest request, string currentUserName);
-        Task<bool> DeleteRolAsync(int id, string currentUserName);
-        Task<bool> HasPermissionAsync(string userName, string modulo);
-        // New methods
-        Task<UserDto?> GetPerfilAsync(string userName);
-        Task<(bool Success, string? ErrorMessage, UserDto? UserDto)> UpdatePerfilAsync(string userName, UpdatePerfilDto dto);
-        Task<bool> DeleteUserAsync(int id, string currentUserName);
-    }
 {
     Task<LoginResponse?> LoginAsync(LoginRequest request);
     Task<List<UserDto>> GetUsersAsync();
     Task<UserDto?> CreateUserAsync(CreateUserRequest request, string currentUserName);
-    Task<bool> UpdateUserAsync(int id, UpdateUserRequest request, string currentUserName);
+    Task<(bool Success, string? ErrorMessage)> UpdateUserAsync(int id, UpdateUserRequest request, string currentUserName);
     Task<bool> ToggleUserStatusAsync(int id, string currentUserName);
     Task<List<RolPersonalizadoDto>> GetRolesAsync();
     Task<RolPersonalizadoDto?> CreateRolAsync(CreateOrUpdateRolRequest request, string currentUserName);
     Task<bool> UpdateRolAsync(int id, CreateOrUpdateRolRequest request, string currentUserName);
     Task<bool> DeleteRolAsync(int id, string currentUserName);
     Task<bool> HasPermissionAsync(string userName, string modulo);
+    Task<UserDto?> GetPerfilAsync(string userName);
+    Task<(bool Success, string? ErrorMessage, LoginResponse? Session)> UpdatePerfilAsync(string userName, UpdatePerfilDto dto);
+    Task<(bool Success, string? ErrorMessage)> DeleteUserAsync(int id, string currentUserName);
 }
 
 public class AuthService : IAuthService
@@ -63,42 +50,39 @@ public class AuthService : IAuthService
         await _context.SaveChangesAsync();
 
         // Obtener permisos/módulos según el rol
-        List<string> modulos = new();
-        var rolDb = await _context.RolesPersonalizados.FirstOrDefaultAsync(r => r.Nombre == user.Rol);
-        if (rolDb != null)
-        {
-            try
-            {
-                modulos = System.Text.Json.JsonSerializer.Deserialize<List<string>>(rolDb.ModulosPermitidosJson) ?? new();
-            }
-            catch { }
-        }
-        else
-        {
-            // Roles por defecto
-            if (user.Rol == "Administrador")
-            {
-                modulos = new List<string> { "dashboard", "cajas", "conteo", "operaciones", "ventas", "reportes", "usuarios", "entradas" };
-            }
-            else if (user.Rol == "Tesorero")
-            {
-                modulos = new List<string> { "dashboard", "cajas", "conteo", "operaciones", "ventas", "reportes", "entradas" };
-            }
-            else
-            {
-                modulos = new List<string> { "dashboard", "cajas", "ventas", "reportes" };
-            }
-        }
-
+        var modulos = await GetModulosForRolAsync(user.Rol);
         var token = GenerateJwtToken(user);
         return new LoginResponse(token, user.UserName, user.Nombre, user.Rol, modulos, user.Id);
     }
 
+    private async Task<List<string>> GetModulosForRolAsync(string rolNombre)
+    {
+        var rolDb = await _context.RolesPersonalizados.FirstOrDefaultAsync(r => r.Nombre == rolNombre);
+        if (rolDb != null)
+        {
+            try
+            {
+                return System.Text.Json.JsonSerializer.Deserialize<List<string>>(rolDb.ModulosPermitidosJson) ?? new();
+            }
+            catch { }
+        }
+
+        if (rolNombre == "Administrador")
+        {
+            return new List<string> { "dashboard", "cajas", "conteo", "operaciones", "ventas", "reportes", "usuarios", "entradas" };
+        }
+        if (rolNombre == "Tesorero")
+        {
+            return new List<string> { "dashboard", "cajas", "conteo", "operaciones", "ventas", "reportes", "entradas" };
+        }
+        return new List<string> { "dashboard", "cajas", "ventas", "reportes" };
+    }
+
     public async Task<List<UserDto>> GetUsersAsync()
     {
-        // Order alphabetically ignoring case
         return await _context.Users
-            .OrderBy(u => u.UserName.ToLower())
+            .OrderBy(u => u.Nombre.ToLower())
+            .ThenBy(u => u.UserName.ToLower())
             .Select(u => new UserDto(u.Id, u.UserName, u.Nombre, u.Rol, u.Activo, u.FechaCreacion, u.UltimoAcceso))
             .ToListAsync();
     }
@@ -133,17 +117,34 @@ public class AuthService : IAuthService
         return new UserDto(user.Id, user.UserName, user.Nombre, user.Rol, user.Activo, user.FechaCreacion, user.UltimoAcceso);
     }
 
-    public async Task<bool> UpdateUserAsync(int id, UpdateUserRequest request, string currentUserName)
+    public async Task<(bool Success, string? ErrorMessage)> UpdateUserAsync(int id, UpdateUserRequest request, string currentUserName)
     {
         var user = await _context.Users.FindAsync(id);
-        if (user == null) return false;
+        if (user == null) return (false, "Usuario no encontrado.");
 
-        user.Nombre = request.Nombre;
+        if (string.IsNullOrWhiteSpace(request.Nombre))
+            return (false, "El nombre completo es obligatorio.");
+
+        if (!string.IsNullOrWhiteSpace(request.UserName))
+        {
+            var newUserName = request.UserName.Trim();
+            if (!string.Equals(user.UserName, newUserName, StringComparison.OrdinalIgnoreCase))
+            {
+                var exists = await _context.Users.AnyAsync(u => u.UserName.ToLower() == newUserName.ToLower() && u.Id != id);
+                if (exists)
+                    return (false, "El nombre de usuario ya está en uso por otra cuenta.");
+                user.UserName = newUserName;
+            }
+        }
+
+        user.Nombre = request.Nombre.Trim();
         user.Rol = request.Rol;
         user.Activo = request.Activo;
         if (!string.IsNullOrWhiteSpace(request.NewPassword))
         {
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+            if (request.NewPassword.Trim().Length < 6)
+                return (false, "La contraseña debe tener al menos 6 caracteres.");
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword.Trim());
         }
 
         _context.Auditoria.Add(new Auditoria
@@ -157,7 +158,114 @@ public class AuthService : IAuthService
         });
 
         await _context.SaveChangesAsync();
-        return true;
+        return (true, null);
+    }
+
+    public async Task<UserDto?> GetPerfilAsync(string userName)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.UserName.ToLower() == userName.ToLower() && u.Activo);
+        if (user == null) return null;
+        return new UserDto(user.Id, user.UserName, user.Nombre, user.Rol, user.Activo, user.FechaCreacion, user.UltimoAcceso);
+    }
+
+    public async Task<(bool Success, string? ErrorMessage, LoginResponse? Session)> UpdatePerfilAsync(string userName, UpdatePerfilDto dto)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.UserName.ToLower() == userName.ToLower() && u.Activo);
+        if (user == null) return (false, "Usuario no encontrado.", null);
+
+        var newNombre = dto.Nombre?.Trim() ?? "";
+        var newUserName = dto.UserName?.Trim() ?? "";
+
+        if (string.IsNullOrWhiteSpace(newNombre))
+            return (false, "El nombre completo es obligatorio.", null);
+        if (string.IsNullOrWhiteSpace(newUserName))
+            return (false, "El nombre de usuario es obligatorio.", null);
+
+        if (!string.Equals(user.UserName, newUserName, StringComparison.OrdinalIgnoreCase))
+        {
+            var exists = await _context.Users.AnyAsync(u => u.UserName.ToLower() == newUserName.ToLower() && u.Id != user.Id);
+            if (exists)
+                return (false, "El nombre de usuario ya está registrado por otra cuenta.", null);
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.PasswordActual) || !string.IsNullOrWhiteSpace(dto.NuevaPassword))
+        {
+            if (string.IsNullOrWhiteSpace(dto.PasswordActual))
+                return (false, "Debes ingresar tu contraseña actual para cambiarla.", null);
+            if (string.IsNullOrWhiteSpace(dto.NuevaPassword))
+                return (false, "Debes ingresar la nueva contraseña.", null);
+
+            if (!BCrypt.Net.BCrypt.Verify(dto.PasswordActual, user.PasswordHash))
+                return (false, "La contraseña actual es incorrecta.", null);
+
+            var pw = dto.NuevaPassword.Trim();
+            if (pw.Length < 6)
+                return (false, "La nueva contraseña debe tener al menos 6 caracteres.", null);
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(pw);
+        }
+
+        user.Nombre = newNombre;
+        user.UserName = newUserName;
+
+        _context.Auditoria.Add(new Auditoria
+        {
+            UsuarioId = user.Id,
+            UsuarioNombre = newUserName,
+            Accion = "ACTUALIZAR_PERFIL",
+            Entidad = "User",
+            EntidadId = user.Id.ToString(),
+            FechaHora = DateTime.UtcNow,
+            Descripcion = $"El usuario {user.UserName} actualizó su perfil personal"
+        });
+
+        await _context.SaveChangesAsync();
+
+        var modulos = await GetModulosForRolAsync(user.Rol);
+        var token = GenerateJwtToken(user);
+        var session = new LoginResponse(token, user.UserName, user.Nombre, user.Rol, modulos, user.Id);
+        return (true, null, session);
+    }
+
+    public async Task<(bool Success, string? ErrorMessage)> DeleteUserAsync(int id, string currentUserName)
+    {
+        var user = await _context.Users.FindAsync(id);
+        if (user == null)
+            return (false, "Usuario no encontrado.");
+
+        if (user.UserName.Equals(currentUserName, StringComparison.OrdinalIgnoreCase))
+            return (false, "No puedes eliminar tu propia cuenta.");
+
+        if (user.Rol == "Administrador" && user.Activo)
+        {
+            var otherActiveAdmins = await _context.Users.CountAsync(u => u.Rol == "Administrador" && u.Activo && u.Id != id);
+            if (otherActiveAdmins == 0)
+                return (false, "No se puede eliminar al último administrador activo del sistema.");
+        }
+
+        // Remover membresías actuales de áreas y desasignar como coordinador si aplica,
+        // conservando íntegramente inventarios, operaciones, conteos y auditorías históricas.
+        var asignaciones = await _context.AreaIntegrantes.Where(ai => ai.UsuarioId == id).ToListAsync();
+        if (asignaciones.Count > 0)
+            _context.AreaIntegrantes.RemoveRange(asignaciones);
+
+        var areasCoordinadas = await _context.Areas.Where(a => a.CoordinadorId == id).ToListAsync();
+        foreach (var area in areasCoordinadas)
+            area.CoordinadorId = null;
+
+        _context.Auditoria.Add(new Auditoria
+        {
+            UsuarioNombre = currentUserName,
+            Accion = "ELIMINAR_USUARIO",
+            Entidad = "User",
+            EntidadId = user.Id.ToString(),
+            FechaHora = DateTime.UtcNow,
+            Descripcion = $"Eliminación permanente de la cuenta '{user.UserName}' ({user.Nombre})"
+        });
+
+        _context.Users.Remove(user);
+        await _context.SaveChangesAsync();
+        return (true, null);
     }
 
     public async Task<bool> ToggleUserStatusAsync(int id, string currentUserName)

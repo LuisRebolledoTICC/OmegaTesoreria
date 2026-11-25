@@ -5,7 +5,7 @@ public record LoginResponse(string Token, string UserName, string Nombre, string
 
 public record UserDto(int Id, string UserName, string Nombre, string Rol, bool Activo, DateTime FechaCreacion, DateTime? UltimoAcceso);
 public record CreateUserRequest(string UserName, string Password, string Nombre, string Rol);
-public record UpdateUserRequest(string Nombre, string Rol, bool Activo, string? NewPassword);
+public record UpdateUserRequest(string Nombre, string Rol, bool Activo, string? NewPassword, string? UserName = null);
 
 public record RolPersonalizadoDto(int Id, string Nombre, string Descripcion, bool EsSistema, List<string> ModulosPermitidos);
 public record CreateOrUpdateRolRequest(string Nombre, string Descripcion, List<string> ModulosPermitidos);

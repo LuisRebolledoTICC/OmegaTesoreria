@@ -27,8 +27,6 @@ public class AuthController : ControllerBase
         return Ok(response);
     }
 
-    [HttpGet("users")] // existing endpoint
-    // New endpoints for profile and deletion
     [HttpGet("perfil")]
     [Authorize]
     public async Task<IActionResult> GetPerfil()
@@ -46,8 +44,7 @@ public class AuthController : ControllerBase
         var userName = User.Identity?.Name ?? "";
         var result = await _authService.UpdatePerfilAsync(userName, request);
         if (!result.Success) return BadRequest(new { message = result.ErrorMessage });
-        // Regenerate token? Frontend can request a new login.
-        return Ok(result.UserDto);
+        return Ok(result.Session);
     }
 
     [HttpDelete("users/{id}")]
@@ -55,9 +52,9 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> DeleteUser(int id)
     {
         var currentUser = User.Identity?.Name ?? "Sistema";
-        var success = await _authService.DeleteUserAsync(id, currentUser);
-        if (!success) return BadRequest(new { message = "No se pudo eliminar el usuario. Puede ser el último administrador o no encontrado." });
-        return Ok(new { message = "Usuario eliminado." });
+        var (success, errorMessage) = await _authService.DeleteUserAsync(id, currentUser);
+        if (!success) return BadRequest(new { message = errorMessage ?? "No se pudo eliminar el usuario." });
+        return Ok(new { message = "Usuario eliminado permanentemente." });
     }
 
     [HttpGet("users")]
@@ -85,8 +82,12 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> UpdateUser(int id, [FromBody] UpdateUserRequest request)
     {
         var currentUser = User.Identity?.Name ?? "Sistema";
-        var success = await _authService.UpdateUserAsync(id, request, currentUser);
-        if (!success) return NotFound();
+        var (success, errorMessage) = await _authService.UpdateUserAsync(id, request, currentUser);
+        if (!success)
+        {
+            if (errorMessage == "Usuario no encontrado.") return NotFound(new { message = errorMessage });
+            return BadRequest(new { message = errorMessage ?? "No se pudo actualizar el usuario." });
+        }
         return Ok(new { message = "Usuario actualizado." });
     }
 

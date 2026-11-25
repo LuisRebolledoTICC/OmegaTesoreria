@@ -14,7 +14,15 @@ import {
   VentaDetalle,
   VentaProducto,
   Pedido,
-  RealizarEntradaVentaResult
+  RealizarEntradaVentaResult,
+  Area,
+  UsuarioDisponible,
+  MiAreaInfo,
+  ProductoInventario,
+  InventarioResumen,
+  InventarioDetalle,
+  ImportarExcelPreview,
+  ImportarExcelItem
 } from '../types';
 
 // Detect host for LAN, Localhost and Embedded mode
@@ -498,5 +506,191 @@ export const api = {
       body: JSON.stringify({ cajaEfectivoId }),
     });
     return handleResponse<RealizarEntradaVentaResult>(res);
+  },
+
+  // --- ÁREAS ---
+  async getAreas(): Promise<Area[]> {
+    const res = await fetch(`${API_BASE_URL}/areas`, { headers: getHeaders() });
+    return handleResponse<Area[]>(res);
+  },
+
+  async getAreaById(id: number): Promise<Area> {
+    const res = await fetch(`${API_BASE_URL}/areas/${id}`, { headers: getHeaders() });
+    return handleResponse<Area>(res);
+  },
+
+  async createArea(data: { nombre: string; descripcion?: string; coordinadorId?: number | null }): Promise<{ message: string; id: number }> {
+    const res = await fetch(`${API_BASE_URL}/areas`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<{ message: string; id: number }>(res);
+  },
+
+  async updateArea(id: number, data: { nombre: string; descripcion?: string; activa: boolean; coordinadorId?: number | null }): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/areas/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    await handleResponse(res);
+  },
+
+  async toggleAreaStatus(id: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/areas/${id}/toggle-status`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+    });
+    await handleResponse(res);
+  },
+
+  async addIntegranteArea(areaId: number, usuarioId: number, forzarCambio = false): Promise<{ message: string }> {
+    const res = await fetch(`${API_BASE_URL}/areas/${areaId}/integrantes`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ usuarioId, forzarCambio }),
+    });
+    if (res.status === 409) {
+      const data = await res.json();
+      const err: any = new Error(data.message || 'El usuario ya pertenece a otra área.');
+      err.status = 409;
+      err.requiereForzar = data.requiereForzar;
+      err.areaActual = data.areaActual;
+      throw err;
+    }
+    return handleResponse<{ message: string }>(res);
+  },
+
+  async removeIntegranteArea(areaId: number, userId: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/areas/${areaId}/integrantes/${userId}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    await handleResponse(res);
+  },
+
+  async getMiArea(): Promise<MiAreaInfo> {
+    const res = await fetch(`${API_BASE_URL}/areas/mi-area`, { headers: getHeaders() });
+    return handleResponse<MiAreaInfo>(res);
+  },
+
+  async getUsuariosDisponiblesArea(): Promise<UsuarioDisponible[]> {
+    const res = await fetch(`${API_BASE_URL}/areas/usuarios-disponibles`, { headers: getHeaders() });
+    return handleResponse<UsuarioDisponible[]>(res);
+  },
+
+  // --- INVENTARIOS ---
+  async getProductosInventario(areaId: number, search?: string): Promise<ProductoInventario[]> {
+    const query = new URLSearchParams({ areaId: String(areaId) });
+    if (search && search.trim()) query.append('search', search.trim());
+    const res = await fetch(`${API_BASE_URL}/inventarios/productos?${query.toString()}`, { headers: getHeaders() });
+    return handleResponse<ProductoInventario[]>(res);
+  },
+
+  async createProductoInventario(areaId: number, data: { nombre: string; unidadMedida: string; cantidadActual: number }): Promise<ProductoInventario> {
+    const res = await fetch(`${API_BASE_URL}/inventarios/productos?areaId=${areaId}`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<ProductoInventario>(res);
+  },
+
+  async updateProductoInventario(id: number, data: { nombre: string; unidadMedida: string; cantidadActual: number }): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/inventarios/productos/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    await handleResponse(res);
+  },
+
+  async getUltimoInventario(areaId: number): Promise<{ existe: boolean; inventario?: InventarioDetalle; areaNombre?: string }> {
+    const res = await fetch(`${API_BASE_URL}/inventarios/ultimo?areaId=${areaId}`, { headers: getHeaders() });
+    return handleResponse<{ existe: boolean; inventario?: InventarioDetalle; areaNombre?: string }>(res);
+  },
+
+  async getHistorialInventarios(areaId: number): Promise<InventarioResumen[]> {
+    const res = await fetch(`${API_BASE_URL}/inventarios/historial?areaId=${areaId}`, { headers: getHeaders() });
+    return handleResponse<InventarioResumen[]>(res);
+  },
+
+  async getInventarioById(id: number): Promise<InventarioDetalle> {
+    const res = await fetch(`${API_BASE_URL}/inventarios/${id}`, { headers: getHeaders() });
+    return handleResponse<InventarioDetalle>(res);
+  },
+
+  async cargarInventario(areaId: number, data: { fechaInventario: string; observaciones?: string; items: ImportarExcelItem[] }): Promise<{ message: string; inventarioId: number }> {
+    const res = await fetch(`${API_BASE_URL}/inventarios/cargar?areaId=${areaId}`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<{ message: string; inventarioId: number }>(res);
+  },
+
+  async importarExcelInventario(areaId: number, file: File): Promise<ImportarExcelPreview> {
+    const formData = new FormData();
+    formData.append('archivo', file);
+    const res = await fetch(`${API_BASE_URL}/inventarios/importar-excel?areaId=${areaId}`, {
+      method: 'POST',
+      headers: getHeaders(false),
+      body: formData,
+    });
+    return handleResponse<ImportarExcelPreview>(res);
+  },
+
+  async descargarPlantillaInventario(): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/inventarios/plantilla-excel`, {
+      method: 'GET',
+      headers: getHeaders(false),
+    });
+    if (!res.ok) throw new Error('No se pudo descargar la plantilla de Excel.');
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'Plantilla_Inventario_Omega.xlsx';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  async exportarInventarioExcel(params: { inventarioId?: number; areaId?: number }): Promise<void> {
+    const query = new URLSearchParams();
+    if (params.inventarioId) query.append('inventarioId', String(params.inventarioId));
+    if (params.areaId) query.append('areaId', String(params.areaId));
+
+    const res = await fetch(`${API_BASE_URL}/inventarios/exportar/excel?${query.toString()}`, {
+      method: 'GET',
+      headers: getHeaders(false),
+    });
+    if (!res.ok) {
+      let msg = 'No se pudo exportar el inventario a Excel.';
+      try {
+        const err = await res.json();
+        msg = err.message || msg;
+      } catch {}
+      throw new Error(msg);
+    }
+
+    const blob = await res.blob();
+    const contentDisposition = res.headers.get('Content-Disposition');
+    let filename = `Inventario_Omega_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`;
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (match && match[1]) filename = match[1].replace(/['"]/g, '');
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
   }
 };

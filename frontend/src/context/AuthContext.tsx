@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../services/api';
 
 interface AuthUser {
+  id?: number;
   userName: string;
   nombre: string;
   rol: string;
@@ -34,6 +35,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (u: string, p: string) => {
     const res = await api.login(u, p);
     const authUser: AuthUser = {
+      id: res.id,
       userName: res.userName,
       nombre: res.nombre,
       rol: res.rol,

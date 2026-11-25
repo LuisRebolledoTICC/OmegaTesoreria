@@ -75,7 +75,7 @@ public class AuthService : IAuthService
         }
 
         var token = GenerateJwtToken(user);
-        return new LoginResponse(token, user.UserName, user.Nombre, user.Rol, modulos);
+        return new LoginResponse(token, user.UserName, user.Nombre, user.Rol, modulos, user.Id);
     }
 
     public async Task<List<UserDto>> GetUsersAsync()

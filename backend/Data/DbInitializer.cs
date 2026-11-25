@@ -17,6 +17,7 @@ public static class DbInitializer
             await context.Database.EnsureCreatedAsync();
             await AddColumnIfNotExistsAsync(context, "TiposBolsas", "CajaId", "INTEGER NULL REFERENCES Cajas(Id)");
             await AddColumnIfNotExistsAsync(context, "Cajas", "Tipo", "TEXT NOT NULL DEFAULT 'EFECTIVO'");
+            await EnsureSqliteAreasInventariosTablesAsync(context);
         }
         else
         {
@@ -32,25 +33,25 @@ public static class DbInitializer
                 new()
                 {
                     Nombre = "Administrador",
-                    Descripcion = "Control total del sistema, administración de usuarios, roles, cajas, ventas y auditoría.",
+                    Descripcion = "Control total del sistema, administración de usuarios, roles, cajas, ventas, áreas, inventarios y auditoría.",
                     EsSistema = true,
-                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"conteo\",\"operaciones\",\"ventas\",\"reportes\",\"usuarios\",\"entradas\"]",
+                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"conteo\",\"operaciones\",\"ventas\",\"reportes\",\"usuarios\",\"entradas\",\"areas\",\"inventarios\",\"areas_crear\",\"areas_editar\",\"areas_desactivar\",\"areas_coordinador\",\"areas_integrantes\",\"inventarios_registrar\",\"inventarios_editar\",\"inventarios_fisico\",\"inventarios_historial\",\"inventarios_exportar\"]",
                     FechaCreacion = DateTime.UtcNow
                 },
                 new()
                 {
                     Nombre = "Tesorero",
-                    Descripcion = "Gestión de cajas, arqueos físicos de efectivo, entradas, salidas, ventas y transferencias.",
+                    Descripcion = "Gestión de cajas, arqueos físicos de efectivo, entradas, salidas, ventas, áreas e inventarios.",
                     EsSistema = true,
-                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"conteo\",\"operaciones\",\"ventas\",\"reportes\",\"entradas\"]",
+                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"conteo\",\"operaciones\",\"ventas\",\"reportes\",\"entradas\",\"areas\",\"inventarios\",\"areas_integrantes\",\"inventarios_registrar\",\"inventarios_editar\",\"inventarios_fisico\",\"inventarios_historial\",\"inventarios_exportar\"]",
                     FechaCreacion = DateTime.UtcNow
                 },
                 new()
                 {
                     Nombre = "Consulta",
-                    Descripcion = "Solo lectura de dashboard, saldos de cajas, ventas y reportes de tesorería.",
+                    Descripcion = "Solo lectura de dashboard, saldos de cajas, ventas, reportes de tesorería, áreas e inventarios.",
                     EsSistema = true,
-                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"ventas\",\"reportes\"]",
+                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"ventas\",\"reportes\",\"areas\",\"inventarios\",\"inventarios_historial\"]",
                     FechaCreacion = DateTime.UtcNow
                 }
             };
@@ -59,23 +60,31 @@ public static class DbInitializer
         }
         else
         {
-            // Asegurar que los módulos "ventas" y "entradas" estén habilitados en los roles base si no los tenían
+            // Asegurar que los módulos nuevos estén habilitados en los roles base si no los tenían
             var roles = await context.RolesPersonalizados.ToListAsync();
+            var adminExtras = new[] { "ventas", "entradas", "areas", "inventarios", "areas_crear", "areas_editar", "areas_desactivar", "areas_coordinador", "areas_integrantes", "inventarios_registrar", "inventarios_editar", "inventarios_fisico", "inventarios_historial", "inventarios_exportar" };
+            var tesoreroExtras = new[] { "ventas", "entradas", "areas", "inventarios", "areas_integrantes", "inventarios_registrar", "inventarios_editar", "inventarios_fisico", "inventarios_historial", "inventarios_exportar" };
+            var consultaExtras = new[] { "ventas", "areas", "inventarios", "inventarios_historial" };
+
             foreach (var r in roles)
             {
                 try
                 {
                     var mods = System.Text.Json.JsonSerializer.Deserialize<List<string>>(r.ModulosPermitidosJson) ?? new();
                     bool modified = false;
-                    if (!mods.Contains("ventas"))
+                    string[] extras;
+                    if (r.Nombre == "Administrador") extras = adminExtras;
+                    else if (r.Nombre == "Tesorero") extras = tesoreroExtras;
+                    else if (r.Nombre == "Consulta") extras = consultaExtras;
+                    else continue;
+
+                    foreach (var mod in extras)
                     {
-                        mods.Add("ventas");
-                        modified = true;
-                    }
-                    if ((r.Nombre == "Administrador" || r.Nombre == "Tesorero") && !mods.Contains("entradas"))
-                    {
-                        mods.Add("entradas");
-                        modified = true;
+                        if (!mods.Contains(mod))
+                        {
+                            mods.Add(mod);
+                            modified = true;
+                        }
                     }
                     if (modified)
                     {
@@ -288,5 +297,65 @@ public static class DbInitializer
         {
             // Salvaguarda
         }
+    }
+
+    private static async Task EnsureSqliteAreasInventariosTablesAsync(AppDbContext context)
+    {
+        var statements = new[]
+        {
+            @"CREATE TABLE IF NOT EXISTS Areas (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Nombre TEXT NOT NULL,
+                Descripcion TEXT NULL,
+                Activa INTEGER NOT NULL DEFAULT 1,
+                CoordinadorId INTEGER NULL REFERENCES Users(Id) ON DELETE SET NULL,
+                FechaCreacion TEXT NOT NULL
+            );",
+            @"CREATE UNIQUE INDEX IF NOT EXISTS IX_Areas_Nombre ON Areas(Nombre);",
+            @"CREATE TABLE IF NOT EXISTS AreaIntegrantes (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                AreaId INTEGER NOT NULL REFERENCES Areas(Id) ON DELETE CASCADE,
+                UsuarioId INTEGER NOT NULL REFERENCES Users(Id) ON DELETE CASCADE,
+                FechaAsignacion TEXT NOT NULL
+            );",
+            @"CREATE UNIQUE INDEX IF NOT EXISTS IX_AreaIntegrantes_UsuarioId ON AreaIntegrantes(UsuarioId);",
+            @"CREATE TABLE IF NOT EXISTS Productos (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                AreaId INTEGER NOT NULL REFERENCES Areas(Id) ON DELETE CASCADE,
+                Nombre TEXT NOT NULL,
+                UnidadMedida TEXT NOT NULL,
+                CantidadActual REAL NOT NULL DEFAULT 0,
+                Activo INTEGER NOT NULL DEFAULT 1,
+                FechaCreacion TEXT NOT NULL
+            );",
+            @"CREATE UNIQUE INDEX IF NOT EXISTS IX_Productos_AreaId_Nombre ON Productos(AreaId, Nombre);",
+            @"CREATE TABLE IF NOT EXISTS Inventarios (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                AreaId INTEGER NOT NULL REFERENCES Areas(Id) ON DELETE CASCADE,
+                FechaInventario TEXT NOT NULL,
+                FechaRegistro TEXT NOT NULL,
+                UsuarioId INTEGER NOT NULL,
+                UsuarioNombre TEXT NOT NULL,
+                Observaciones TEXT NULL
+            );",
+            @"CREATE INDEX IF NOT EXISTS IX_Inventarios_FechaInventario ON Inventarios(FechaInventario);",
+            @"CREATE TABLE IF NOT EXISTS InventarioDetalles (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                InventarioId INTEGER NOT NULL REFERENCES Inventarios(Id) ON DELETE CASCADE,
+                ProductoId INTEGER NULL REFERENCES Productos(Id) ON DELETE SET NULL,
+                NombreProducto TEXT NOT NULL,
+                UnidadMedida TEXT NOT NULL,
+                Cantidad REAL NOT NULL
+            );"
+        };
+
+        try
+        {
+            foreach (var sql in statements)
+            {
+                await context.Database.ExecuteSqlRawAsync(sql);
+            }
+        }
+        catch { }
     }
 }

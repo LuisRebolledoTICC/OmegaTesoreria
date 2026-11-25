@@ -9,6 +9,8 @@ import {
   ShieldCheck,
   LogOut,
   ShoppingBag,
+  Building2,
+  Package,
   X
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +21,8 @@ export type ActiveTab =
   | 'cajas'
   | 'conteo'
   | 'operaciones'
+  | 'areas'
+  | 'inventarios'
   | 'reportes'
   | 'usuarios';
 
@@ -71,6 +75,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'cajas' as ActiveTab, label: 'Cajas de Tesorería', icon: Wallet, show: canAccessModule('cajas') },
     { id: 'conteo' as ActiveTab, label: 'Conteo de Efectivo', icon: Calculator, show: canAccessModule('conteo') },
     { id: 'operaciones' as ActiveTab, label: 'Movimientos por Caja', icon: ArrowLeftRight, show: canAccessModule('operaciones') },
+    { id: 'areas' as ActiveTab, label: 'Áreas', icon: Building2, show: canAccessModule('areas') },
+    { id: 'inventarios' as ActiveTab, label: 'Inventarios', icon: Package, show: canAccessModule('inventarios') },
     { id: 'reportes' as ActiveTab, label: 'Reportes y Excel', icon: FileSpreadsheet, show: canAccessModule('reportes') },
     { id: 'usuarios' as ActiveTab, label: 'Usuarios y Permisos', icon: Users, show: canAccessModule('usuarios') },
   ];

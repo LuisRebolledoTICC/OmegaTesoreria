@@ -41,6 +41,67 @@ namespace backend.Migrations
                     b.ToTable("DataProtectionKeys");
                 });
 
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.Area", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Activa")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("CoordinadorId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Descripcion")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CoordinadorId");
+
+                    b.HasIndex("Nombre")
+                        .IsUnique();
+
+                    b.ToTable("Areas");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.AreaIntegrante", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AreaId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("FechaAsignacion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AreaId");
+
+                    b.HasIndex("UsuarioId")
+                        .IsUnique();
+
+                    b.ToTable("AreaIntegrantes");
+                });
+
             modelBuilder.Entity("OmegaTesoreria.Api.Models.Auditoria", b =>
                 {
                     b.Property<int>("Id")
@@ -316,6 +377,77 @@ namespace backend.Migrations
                     b.ToTable("DetalleOperaciones");
                 });
 
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.Inventario", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AreaId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("FechaInventario")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("FechaRegistro")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Observaciones")
+                        .HasColumnType("text");
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UsuarioNombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AreaId");
+
+                    b.HasIndex("FechaInventario");
+
+                    b.ToTable("Inventarios");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.InventarioDetalle", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Cantidad")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<int>("InventarioId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("NombreProducto")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int?>("ProductoId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UnidadMedida")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InventarioId");
+
+                    b.HasIndex("ProductoId");
+
+                    b.ToTable("InventarioDetalles");
+                });
+
             modelBuilder.Entity("OmegaTesoreria.Api.Models.Operacion", b =>
                 {
                     b.Property<int>("Id")
@@ -498,6 +630,43 @@ namespace backend.Migrations
                     b.HasIndex("PedidoId");
 
                     b.ToTable("PedidoPagos");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.Producto", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("AreaId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("CantidadActual")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("UnidadMedida")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AreaId", "Nombre")
+                        .IsUnique();
+
+                    b.ToTable("Productos");
                 });
 
             modelBuilder.Entity("OmegaTesoreria.Api.Models.RolPersonalizado", b =>
@@ -721,6 +890,35 @@ namespace backend.Migrations
                     b.ToTable("VentaProductos");
                 });
 
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.Area", b =>
+                {
+                    b.HasOne("OmegaTesoreria.Api.Models.User", "Coordinador")
+                        .WithMany()
+                        .HasForeignKey("CoordinadorId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Coordinador");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.AreaIntegrante", b =>
+                {
+                    b.HasOne("OmegaTesoreria.Api.Models.Area", "Area")
+                        .WithMany("Integrantes")
+                        .HasForeignKey("AreaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OmegaTesoreria.Api.Models.User", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Area");
+
+                    b.Navigation("Usuario");
+                });
+
             modelBuilder.Entity("OmegaTesoreria.Api.Models.CajaEfectivo", b =>
                 {
                     b.HasOne("OmegaTesoreria.Api.Models.Caja", "Caja")
@@ -778,6 +976,35 @@ namespace backend.Migrations
                     b.Navigation("TipoBolsa");
                 });
 
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.Inventario", b =>
+                {
+                    b.HasOne("OmegaTesoreria.Api.Models.Area", "Area")
+                        .WithMany("Inventarios")
+                        .HasForeignKey("AreaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Area");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.InventarioDetalle", b =>
+                {
+                    b.HasOne("OmegaTesoreria.Api.Models.Inventario", "Inventario")
+                        .WithMany("Detalles")
+                        .HasForeignKey("InventarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OmegaTesoreria.Api.Models.Producto", "Producto")
+                        .WithMany()
+                        .HasForeignKey("ProductoId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Inventario");
+
+                    b.Navigation("Producto");
+                });
+
             modelBuilder.Entity("OmegaTesoreria.Api.Models.Operacion", b =>
                 {
                     b.HasOne("OmegaTesoreria.Api.Models.Caja", "CajaDestino")
@@ -828,6 +1055,17 @@ namespace backend.Migrations
                     b.Navigation("Pedido");
                 });
 
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.Producto", b =>
+                {
+                    b.HasOne("OmegaTesoreria.Api.Models.Area", "Area")
+                        .WithMany("Productos")
+                        .HasForeignKey("AreaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Area");
+                });
+
             modelBuilder.Entity("OmegaTesoreria.Api.Models.TipoBolsa", b =>
                 {
                     b.HasOne("OmegaTesoreria.Api.Models.Caja", "Caja")
@@ -866,9 +1104,23 @@ namespace backend.Migrations
                     b.Navigation("Venta");
                 });
 
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.Area", b =>
+                {
+                    b.Navigation("Integrantes");
+
+                    b.Navigation("Inventarios");
+
+                    b.Navigation("Productos");
+                });
+
             modelBuilder.Entity("OmegaTesoreria.Api.Models.Caja", b =>
                 {
                     b.Navigation("EfectivoDisponible");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.Inventario", b =>
+                {
+                    b.Navigation("Detalles");
                 });
 
             modelBuilder.Entity("OmegaTesoreria.Api.Models.Operacion", b =>

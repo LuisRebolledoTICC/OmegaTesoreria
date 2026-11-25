@@ -1,7 +1,7 @@
 namespace OmegaTesoreria.Api.DTOs;
 
 public record LoginRequest(string UserName, string Password);
-public record LoginResponse(string Token, string UserName, string Nombre, string Rol, List<string>? ModulosPermitidos = null);
+public record LoginResponse(string Token, string UserName, string Nombre, string Rol, List<string>? ModulosPermitidos = null, int Id = 0);
 
 public record UserDto(int Id, string UserName, string Nombre, string Rol, bool Activo, DateTime FechaCreacion, DateTime? UltimoAcceso);
 public record CreateUserRequest(string UserName, string Password, string Nombre, string Rol);

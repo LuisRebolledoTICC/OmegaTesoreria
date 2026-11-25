@@ -29,6 +29,20 @@ const MODULOS_DISPONIBLES = [
   { id: 'reportes', nombre: 'Reportes y Excel', descripcion: 'Auditorías y exportación de archivos Excel' },
   { id: 'usuarios', nombre: 'Usuarios y Permisos', descripcion: 'Gestión de usuarios y personalización de roles' },
   { id: 'entradas', nombre: 'Realizar Entradas', descripcion: 'Permiso para realizar y registrar entradas de dinero a cajas y desde Ventas' },
+  // Módulo Áreas
+  { id: 'areas', nombre: 'Áreas: Ver áreas', descripcion: 'Permite acceder al módulo Áreas y consultar su información' },
+  { id: 'areas_crear', nombre: 'Áreas: Crear áreas', descripcion: 'Permite crear nuevas áreas' },
+  { id: 'areas_editar', nombre: 'Áreas: Editar áreas', descripcion: 'Permite modificar nombre y descripción de áreas' },
+  { id: 'areas_desactivar', nombre: 'Áreas: Desactivar áreas', descripcion: 'Permite activar o desactivar áreas conservando su historial' },
+  { id: 'areas_coordinador', nombre: 'Áreas: Asignar coordinadores', descripcion: 'Permite asignar o cambiar el coordinador de un área' },
+  { id: 'areas_integrantes', nombre: 'Áreas: Administrar integrantes del área', descripcion: 'Permite al coordinador agregar y retirar integrantes de su propia área' },
+  // Módulo Inventarios
+  { id: 'inventarios', nombre: 'Inventarios: Ver inventario', descripcion: 'Permite consultar el inventario del área asignada' },
+  { id: 'inventarios_registrar', nombre: 'Inventarios: Registrar productos', descripcion: 'Permite dar de alta nuevos productos en el área' },
+  { id: 'inventarios_editar', nombre: 'Inventarios: Editar productos', descripcion: 'Permite modificar nombre, unidad y cantidad de productos' },
+  { id: 'inventarios_fisico', nombre: 'Inventarios: Realizar inventarios físicos', descripcion: 'Permite cargar inventarios por fecha mediante Excel o captura' },
+  { id: 'inventarios_historial', nombre: 'Inventarios: Consultar historial', descripcion: 'Permite ver inventarios anteriores por fecha' },
+  { id: 'inventarios_exportar', nombre: 'Inventarios: Exportar reportes', descripcion: 'Permite descargar inventarios en Excel y PDF' },
 ];
 
 export const UsuariosView: React.FC = () => {

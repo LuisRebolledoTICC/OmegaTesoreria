@@ -29,6 +29,13 @@ public class AppDbContext : DbContext, IDataProtectionKeyContext
     public DbSet<PedidoDetalle> PedidoDetalles => Set<PedidoDetalle>();
     public DbSet<PedidoPago> PedidoPagos => Set<PedidoPago>();
 
+    // Módulo Áreas e Inventarios
+    public DbSet<Area> Areas => Set<Area>();
+    public DbSet<AreaIntegrante> AreaIntegrantes => Set<AreaIntegrante>();
+    public DbSet<Producto> Productos => Set<Producto>();
+    public DbSet<Inventario> Inventarios => Set<Inventario>();
+    public DbSet<InventarioDetalle> InventarioDetalles => Set<InventarioDetalle>();
+
     // Persistencia de claves criptográficas de ASP.NET Core Data Protection
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -62,6 +69,10 @@ public class AppDbContext : DbContext, IDataProtectionKeyContext
             modelBuilder.Entity<PedidoDetalle>().Property(d => d.PrecioUnitario).HasConversion<double>();
             modelBuilder.Entity<PedidoDetalle>().Property(d => d.Subtotal).HasConversion<double>();
             modelBuilder.Entity<PedidoPago>().Property(p => p.Importe).HasConversion<double>();
+
+            // Inventarios en SQLite
+            modelBuilder.Entity<Producto>().Property(p => p.CantidadActual).HasConversion<double>();
+            modelBuilder.Entity<InventarioDetalle>().Property(d => d.Cantidad).HasConversion<double>();
         }
         else
         {
@@ -87,6 +98,10 @@ public class AppDbContext : DbContext, IDataProtectionKeyContext
             modelBuilder.Entity<PedidoDetalle>().Property(d => d.PrecioUnitario).HasPrecision(18, 2);
             modelBuilder.Entity<PedidoDetalle>().Property(d => d.Subtotal).HasPrecision(18, 2);
             modelBuilder.Entity<PedidoPago>().Property(p => p.Importe).HasPrecision(18, 2);
+
+            // Inventarios en PostgreSQL
+            modelBuilder.Entity<Producto>().Property(p => p.CantidadActual).HasPrecision(18, 4);
+            modelBuilder.Entity<InventarioDetalle>().Property(d => d.Cantidad).HasPrecision(18, 4);
         }
 
         // Relaciones
@@ -156,11 +171,72 @@ public class AppDbContext : DbContext, IDataProtectionKeyContext
             .HasForeignKey(b => b.CajaId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // ========== Relaciones Áreas e Inventarios ==========
+
+        // Area -> Coordinador
+        modelBuilder.Entity<Area>()
+            .HasOne(a => a.Coordinador)
+            .WithMany()
+            .HasForeignKey(a => a.CoordinadorId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Area -> Integrantes
+        modelBuilder.Entity<Area>()
+            .HasMany(a => a.Integrantes)
+            .WithOne(i => i.Area)
+            .HasForeignKey(i => i.AreaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<AreaIntegrante>()
+            .HasOne(i => i.Usuario)
+            .WithMany()
+            .HasForeignKey(i => i.UsuarioId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Un usuario solo puede pertenecer a un área a la vez
+        modelBuilder.Entity<AreaIntegrante>()
+            .HasIndex(i => i.UsuarioId)
+            .IsUnique();
+
+        // Area -> Productos
+        modelBuilder.Entity<Area>()
+            .HasMany(a => a.Productos)
+            .WithOne(p => p.Area)
+            .HasForeignKey(p => p.AreaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Area -> Inventarios
+        modelBuilder.Entity<Area>()
+            .HasMany(a => a.Inventarios)
+            .WithOne(i => i.Area)
+            .HasForeignKey(i => i.AreaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Inventario -> Detalles
+        modelBuilder.Entity<Inventario>()
+            .HasMany(i => i.Detalles)
+            .WithOne(d => d.Inventario)
+            .HasForeignKey(d => d.InventarioId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<InventarioDetalle>()
+            .HasOne(d => d.Producto)
+            .WithMany()
+            .HasForeignKey(d => d.ProductoId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Índice único para nombre de producto por área
+        modelBuilder.Entity<Producto>()
+            .HasIndex(p => new { p.AreaId, p.Nombre })
+            .IsUnique();
+
         // Índices para rendimiento en PostgreSQL
         modelBuilder.Entity<User>().HasIndex(u => u.UserName).IsUnique();
         modelBuilder.Entity<Operacion>().HasIndex(o => o.FechaOperacion);
         modelBuilder.Entity<Operacion>().HasIndex(o => o.TipoOperacion);
         modelBuilder.Entity<Conteo>().HasIndex(c => c.FechaConteo);
         modelBuilder.Entity<Auditoria>().HasIndex(a => a.FechaHora);
+        modelBuilder.Entity<Area>().HasIndex(a => a.Nombre).IsUnique();
+        modelBuilder.Entity<Inventario>().HasIndex(i => i.FechaInventario);
     }
 }

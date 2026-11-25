@@ -17,6 +17,7 @@ export interface RolPersonalizado {
 }
 
 export interface LoginResponse {
+  id?: number;
   token: string;
   userName: string;
   nombre: string;
@@ -267,4 +268,93 @@ export interface RealizarEntradaVentaResult {
   importeEfectivo: number;
   operacionTransferenciaId?: number;
   importeTransferencia: number;
+}
+
+// --- MÓDULO ÁREAS E INVENTARIOS ---
+export interface AreaIntegrante {
+  id: number;
+  usuarioId: number;
+  usuarioNombre: string;
+  usuarioUserName: string;
+  fechaAsignacion: string;
+}
+
+export interface Area {
+  id: number;
+  nombre: string;
+  descripcion?: string;
+  activa: boolean;
+  coordinadorId?: number | null;
+  coordinadorNombre?: string | null;
+  fechaCreacion: string;
+  integrantes: AreaIntegrante[];
+}
+
+export interface UsuarioDisponible {
+  id: number;
+  nombre: string;
+  userName: string;
+  rol: string;
+  areaActualId?: number | null;
+  areaActualNombre?: string | null;
+}
+
+export interface MiAreaInfo {
+  areaId: number | null;
+  areaNombre: string | null;
+  esCoordinador?: boolean;
+}
+
+export interface ProductoInventario {
+  id: number;
+  areaId: number;
+  nombre: string;
+  unidadMedida: string;
+  cantidadActual: number;
+  activo: boolean;
+  fechaCreacion: string;
+}
+
+export interface InventarioResumen {
+  id: number;
+  areaId: number;
+  areaNombre: string;
+  fechaInventario: string;
+  fechaRegistro: string;
+  usuarioNombre: string;
+  observaciones?: string;
+  totalProductos: number;
+}
+
+export interface InventarioItem {
+  id: number;
+  productoId?: number | null;
+  nombreProducto: string;
+  unidadMedida: string;
+  cantidad: number;
+}
+
+export interface InventarioDetalle {
+  id: number;
+  areaId: number;
+  areaNombre: string;
+  fechaInventario: string;
+  fechaRegistro: string;
+  usuarioNombre: string;
+  observaciones?: string;
+  detalles: InventarioItem[];
+}
+
+export interface ImportarExcelItem {
+  producto: string;
+  cantidad: number;
+  unidadMedida: string;
+}
+
+export interface ImportarExcelPreview {
+  items: ImportarExcelItem[];
+  errores: string[];
+  totalValidos: number;
+  totalErrores: number;
+  areaNombre?: string;
 }

@@ -11,6 +11,8 @@ import { ReportesView } from './pages/ReportesView';
 import { UsuariosView } from './pages/UsuariosView';
 import { RespaldosView } from './pages/RespaldosView';
 import { VentasView } from './pages/VentasView';
+import { AreasView } from './pages/AreasView';
+import { InventariosView } from './pages/InventariosView';
 import { Caja, DashboardSummary } from './types';
 import { api } from './services/api';
 import { Lock } from 'lucide-react';
@@ -21,6 +23,8 @@ const ORDERED_TABS: ActiveTab[] = [
   'cajas',
   'conteo',
   'operaciones',
+  'areas',
+  'inventarios',
   'reportes',
   'usuarios',
 ];
@@ -110,6 +114,8 @@ const MainLayout: React.FC = () => {
     cajas: 'Administración de Cajas',
     conteo: 'Conteo Físico de Efectivo',
     operaciones: 'Movimientos por Cada Caja',
+    areas: 'Administración de Áreas',
+    inventarios: 'Control de Inventarios',
     reportes: 'Reportes y Exportación',
     usuarios: 'Administración de Usuarios y Permisos',
   };
@@ -181,6 +187,10 @@ const MainLayout: React.FC = () => {
               onOperationCompleted={loadData}
             />
           )}
+
+          {currentTab === 'areas' && canAccessModule('areas') && <AreasView />}
+
+          {currentTab === 'inventarios' && canAccessModule('inventarios') && <InventariosView />}
 
           {currentTab === 'reportes' && canAccessModule('reportes') && (
             <ReportesView

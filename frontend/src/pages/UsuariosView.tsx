@@ -50,6 +50,7 @@ const MODULOS_DISPONIBLES = [
   { id: 'inventarios_ver_todos', nombre: 'Inventarios: Ver todos los inventarios', descripcion: 'Permite consultar los inventarios de todas las áreas activas aunque no tenga un área asignada' },
   { id: 'inventarios_registrar', nombre: 'Inventarios: Registrar productos', descripcion: 'Permite dar de alta nuevos productos en el área' },
   { id: 'inventarios_editar', nombre: 'Inventarios: Editar productos', descripcion: 'Permite modificar nombre, unidad y cantidad de productos' },
+  { id: 'inventarios_eliminar', nombre: 'Inventarios: Eliminar productos', descripcion: 'Permite eliminar productos del inventario actual del área' },
   { id: 'inventarios_fisico', nombre: 'Inventarios: Realizar inventarios físicos', descripcion: 'Permite cargar inventarios por fecha mediante Excel o captura' },
   { id: 'inventarios_historial', nombre: 'Inventarios: Consultar historial', descripcion: 'Permite ver inventarios anteriores por fecha' },
   { id: 'inventarios_exportar', nombre: 'Inventarios: Exportar reportes', descripcion: 'Permite descargar inventarios en Excel y PDF' },

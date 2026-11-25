@@ -161,6 +161,49 @@ public class InventariosController : ControllerBase
         return Ok(new { message = "Producto actualizado." });
     }
 
+    // DELETE: api/inventarios/productos/{id}?areaId=1
+    [HttpDelete("productos/{id}")]
+    public async Task<IActionResult> DeleteProducto(int id, [FromQuery] int? areaId = null)
+    {
+        var userName = GetUserName();
+        var hasPermission = await _authService.HasPermissionAsync(userName, "inventarios_eliminar");
+        if (!hasPermission && !IsAdmin()) return Forbid();
+
+        var producto = await _context.Productos.FindAsync(id);
+        if (producto == null) return NotFound(new { message = "Producto no encontrado." });
+
+        if (areaId.HasValue && producto.AreaId != areaId.Value)
+            return BadRequest(new { message = "El producto no pertenece al área seleccionada." });
+
+        var (allowed, area) = await CheckAreaAccess(producto.AreaId);
+        if (area != null && !area.Activa)
+            return BadRequest(new { message = "No se pueden eliminar productos de un área desactivada." });
+        if (!allowed) return Forbid();
+
+        // Conservar íntegros los registros históricos en InventarioDetalles (desvinculando ProductoId)
+        var detalles = await _context.InventarioDetalles.Where(d => d.ProductoId == id).ToListAsync();
+        foreach (var d in detalles)
+        {
+            d.ProductoId = null;
+        }
+
+        _context.Auditoria.Add(new Auditoria
+        {
+            UsuarioId = GetUserId(),
+            UsuarioNombre = userName,
+            Accion = "ELIMINAR_PRODUCTO",
+            Entidad = "Producto",
+            EntidadId = producto.Id.ToString(),
+            FechaHora = DateTime.UtcNow,
+            Descripcion = $"Eliminación del producto '{producto.Nombre}' del área '{area?.Nombre ?? producto.AreaId.ToString()}'"
+        });
+
+        _context.Productos.Remove(producto);
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = $"Producto '{producto.Nombre}' eliminado del inventario actual." });
+    }
+
     // =================== INVENTARIOS ===================
 
     // GET: api/inventarios/historial?areaId=1

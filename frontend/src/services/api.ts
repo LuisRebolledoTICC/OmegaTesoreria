@@ -646,6 +646,15 @@ export const api = {
     await handleResponse(res);
   },
 
+  async deleteProductoInventario(id: number, areaId?: number): Promise<{ message: string }> {
+    const qs = areaId ? `?areaId=${areaId}` : '';
+    const res = await fetch(`${API_BASE_URL}/inventarios/productos/${id}${qs}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    return handleResponse<{ message: string }>(res);
+  },
+
   async getUltimoInventario(areaId: number): Promise<{ existe: boolean; inventario?: InventarioDetalle; areaNombre?: string }> {
     const res = await fetch(`${API_BASE_URL}/inventarios/ultimo?areaId=${areaId}`, { headers: getHeaders() });
     return handleResponse<{ existe: boolean; inventario?: InventarioDetalle; areaNombre?: string }>(res);

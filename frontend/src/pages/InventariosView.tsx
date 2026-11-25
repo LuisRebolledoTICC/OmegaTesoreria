@@ -4,6 +4,7 @@ import {
   Search,
   Plus,
   Pencil,
+  Trash2,
   Upload,
   Download,
   History,
@@ -61,6 +62,11 @@ export const InventariosView: React.FC = () => {
   const [savingProd, setSavingProd] = useState(false);
   const [prodError, setProdError] = useState<string | null>(null);
 
+  // Modal Eliminar Producto
+  const [productoForDelete, setProductoForDelete] = useState<ProductoInventario | null>(null);
+  const [deletingProd, setDeletingProd] = useState(false);
+  const [deleteProdError, setDeleteProdError] = useState<string | null>(null);
+
   // Carga de inventario físico / Excel
   const [fechaCarga, setFechaCarga] = useState(() => new Date().toISOString().slice(0, 10));
   const [observacionesCarga, setObservacionesCarga] = useState('');
@@ -79,6 +85,7 @@ export const InventariosView: React.FC = () => {
   const canVerTodos = isAdmin || canAccessModule('inventarios_ver_todos');
   const canRegistrar = isAdmin || canAccessModule('inventarios_registrar');
   const canEditar = isAdmin || canAccessModule('inventarios_editar');
+  const canEliminar = isAdmin || canAccessModule('inventarios_eliminar');
   const canFisico = isAdmin || canAccessModule('inventarios_fisico');
   const canHistorial = isAdmin || canAccessModule('inventarios_historial');
   const canExportar = isAdmin || canAccessModule('inventarios_exportar');
@@ -248,6 +255,27 @@ export const InventariosView: React.FC = () => {
       setProdError(err.message || 'Error al guardar el producto.');
     } finally {
       setSavingProd(false);
+    }
+  };
+
+  const handleOpenDeleteProducto = (p: ProductoInventario) => {
+    setProductoForDelete(p);
+    setDeleteProdError(null);
+  };
+
+  const handleConfirmDeleteProducto = async () => {
+    if (!productoForDelete || !selectedAreaId) return;
+    setDeletingProd(true);
+    setDeleteProdError(null);
+    try {
+      await api.deleteProductoInventario(productoForDelete.id, selectedAreaId);
+      showToast(`Producto "${productoForDelete.nombre}" eliminado correctamente.`);
+      setProductoForDelete(null);
+      await loadAreaInventory(selectedAreaId, search);
+    } catch (err: any) {
+      setDeleteProdError(err.message || 'No se pudo eliminar el producto.');
+    } finally {
+      setDeletingProd(false);
     }
   };
 
@@ -575,15 +603,29 @@ export const InventariosView: React.FC = () => {
                       <span className="px-3 py-1 rounded-lg bg-slate-100 text-slate-900 font-bold text-sm">
                         {p.cantidadActual}
                       </span>
-                      {canEditar && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditProducto(p)}
-                          className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition"
-                          title="Editar producto"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
+                      {(canEditar || canEliminar) && (
+                        <>
+                          {canEditar && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditProducto(p)}
+                              className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition"
+                              title="Editar producto"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          )}
+                          {canEliminar && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDeleteProducto(p)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                              title="Eliminar producto"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -598,7 +640,7 @@ export const InventariosView: React.FC = () => {
                       <th className="py-3 px-4">Producto</th>
                       <th className="py-3 px-4 text-right">Cantidad actual</th>
                       <th className="py-3 px-4">Unidad de medida</th>
-                      {canEditar && <th className="py-3 px-4 text-right print:hidden">Acciones</th>}
+                      {(canEditar || canEliminar) && <th className="py-3 px-4 text-right print:hidden">Acciones</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
@@ -607,16 +649,31 @@ export const InventariosView: React.FC = () => {
                         <td className="py-3 px-4 font-semibold text-slate-800">{p.nombre}</td>
                         <td className="py-3 px-4 text-right font-bold text-slate-900">{p.cantidadActual}</td>
                         <td className="py-3 px-4 text-slate-600">{p.unidadMedida}</td>
-                        {canEditar && (
+                        {(canEditar || canEliminar) && (
                           <td className="py-3 px-4 text-right print:hidden">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditProducto(p)}
-                              className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50 rounded-lg transition cursor-pointer"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                              <span>Editar</span>
-                            </button>
+                            <div className="inline-flex items-center justify-end space-x-1">
+                              {canEditar && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditProducto(p)}
+                                  className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50 rounded-lg transition cursor-pointer"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                  <span>Editar</span>
+                                </button>
+                              )}
+                              {canEliminar && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenDeleteProducto(p)}
+                                  className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                                  title="Eliminar producto"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Eliminar</span>
+                                </button>
+                              )}
+                            </div>
                           </td>
                         )}
                       </tr>
@@ -1014,6 +1071,57 @@ export const InventariosView: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmar Eliminación de Producto */}
+      {productoForDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-red-200 overflow-hidden p-6">
+            <div className="flex items-center space-x-3 mb-3">
+              <div className="p-2.5 bg-red-100 text-red-700 rounded-xl shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Eliminar Producto</h3>
+                <p className="text-xs text-red-600 font-semibold">Se eliminará únicamente del área actual.</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 space-y-1 mb-4">
+              <p>
+                ¿Confirmas eliminar <strong className="text-slate-900">{productoForDelete.nombre}</strong>?
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Existencia actual: <strong>{productoForDelete.cantidadActual}</strong> ({productoForDelete.unidadMedida}). Los inventarios históricos donde haya sido registrado se conservarán intactos.
+              </p>
+            </div>
+
+            {deleteProdError && (
+              <div className="p-3 mb-4 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+                {deleteProdError}
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setProductoForDelete(null)}
+                disabled={deletingProd}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteProducto}
+                disabled={deletingProd}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg shadow-xs disabled:opacity-50 cursor-pointer"
+              >
+                {deletingProd ? 'Eliminando...' : 'Sí, eliminar producto'}
+              </button>
+            </div>
           </div>
         </div>
       )}

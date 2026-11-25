@@ -36,7 +36,7 @@ public static class DbInitializer
                     Nombre = "Administrador",
                     Descripcion = "Control total del sistema, administración de usuarios, roles, cajas, ventas, áreas, inventarios y auditoría.",
                     EsSistema = true,
-                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"conteo\",\"operaciones\",\"ventas\",\"reportes\",\"usuarios\",\"entradas\",\"areas\",\"inventarios\",\"areas_crear\",\"areas_editar\",\"areas_desactivar\",\"areas_coordinador\",\"areas_integrantes\",\"inventarios_ver_todos\",\"inventarios_registrar\",\"inventarios_editar\",\"inventarios_fisico\",\"inventarios_historial\",\"inventarios_exportar\"]",
+                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"conteo\",\"operaciones\",\"ventas\",\"reportes\",\"usuarios\",\"entradas\",\"areas\",\"inventarios\",\"areas_crear\",\"areas_editar\",\"areas_desactivar\",\"areas_coordinador\",\"areas_integrantes\",\"inventarios_ver_todos\",\"inventarios_registrar\",\"inventarios_editar\",\"inventarios_eliminar\",\"inventarios_fisico\",\"inventarios_historial\",\"inventarios_exportar\"]",
                     FechaCreacion = DateTime.UtcNow
                 },
                 new()
@@ -44,7 +44,7 @@ public static class DbInitializer
                     Nombre = "Tesorero",
                     Descripcion = "Gestión de cajas, arqueos físicos de efectivo, entradas, salidas, ventas, áreas e inventarios.",
                     EsSistema = true,
-                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"conteo\",\"operaciones\",\"ventas\",\"reportes\",\"entradas\",\"areas\",\"inventarios\",\"areas_integrantes\",\"inventarios_registrar\",\"inventarios_editar\",\"inventarios_fisico\",\"inventarios_historial\",\"inventarios_exportar\"]",
+                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"conteo\",\"operaciones\",\"ventas\",\"reportes\",\"entradas\",\"areas\",\"inventarios\",\"areas_integrantes\",\"inventarios_registrar\",\"inventarios_editar\",\"inventarios_eliminar\",\"inventarios_fisico\",\"inventarios_historial\",\"inventarios_exportar\"]",
                     FechaCreacion = DateTime.UtcNow
                 },
                 new()
@@ -63,8 +63,8 @@ public static class DbInitializer
         {
             // Asegurar que los módulos nuevos estén habilitados en los roles base si no los tenían
             var roles = await context.RolesPersonalizados.ToListAsync();
-            var adminExtras = new[] { "ventas", "entradas", "areas", "inventarios", "areas_crear", "areas_editar", "areas_desactivar", "areas_coordinador", "areas_integrantes", "inventarios_ver_todos", "inventarios_registrar", "inventarios_editar", "inventarios_fisico", "inventarios_historial", "inventarios_exportar" };
-            var tesoreroExtras = new[] { "ventas", "entradas", "areas", "inventarios", "areas_integrantes", "inventarios_registrar", "inventarios_editar", "inventarios_fisico", "inventarios_historial", "inventarios_exportar" };
+            var adminExtras = new[] { "ventas", "entradas", "areas", "inventarios", "areas_crear", "areas_editar", "areas_desactivar", "areas_coordinador", "areas_integrantes", "inventarios_ver_todos", "inventarios_registrar", "inventarios_editar", "inventarios_eliminar", "inventarios_fisico", "inventarios_historial", "inventarios_exportar" };
+            var tesoreroExtras = new[] { "ventas", "entradas", "areas", "inventarios", "areas_integrantes", "inventarios_registrar", "inventarios_editar", "inventarios_eliminar", "inventarios_fisico", "inventarios_historial", "inventarios_exportar" };
             var consultaExtras = new[] { "ventas", "areas", "inventarios", "inventarios_historial" };
 
             foreach (var r in roles)

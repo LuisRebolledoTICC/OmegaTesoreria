@@ -448,6 +448,95 @@ namespace backend.Migrations
                     b.ToTable("InventarioDetalles");
                 });
 
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.MovimientoPresupuesto", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AreaId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("CajaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CajaNombre")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CanceladoPor")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Concepto")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Descripcion")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EditadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("FechaCancelacion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("FechaMovimiento")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("FechaRegistro")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("FechaUltimaEdicion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Importe")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("MotivoCancelacion")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("OperacionTesoreriaId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PresupuestoAreaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TipoMovimiento")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UsuarioNombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AreaId");
+
+                    b.HasIndex("CajaId");
+
+                    b.HasIndex("Estado");
+
+                    b.HasIndex("FechaMovimiento");
+
+                    b.HasIndex("OperacionTesoreriaId");
+
+                    b.HasIndex("PresupuestoAreaId");
+
+                    b.HasIndex("TipoMovimiento");
+
+                    b.ToTable("MovimientosPresupuesto");
+                });
+
             modelBuilder.Entity("OmegaTesoreria.Api.Models.Operacion", b =>
                 {
                     b.Property<int>("Id")
@@ -630,6 +719,125 @@ namespace backend.Migrations
                     b.HasIndex("PedidoId");
 
                     b.ToTable("PedidoPagos");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.PresupuestoArea", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AreaId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("FechaActualizacion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("SaldoDisponible")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("TotalAjustes")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("TotalDevuelto")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("TotalGastado")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("TotalRecibido")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AreaId")
+                        .IsUnique();
+
+                    b.ToTable("PresupuestosArea");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.PresupuestoEvidencia", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("DatosBase64")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("FechaSubida")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MovimientoPresupuestoId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("NombreArchivo")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MovimientoPresupuestoId");
+
+                    b.ToTable("PresupuestoEvidencias");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.PresupuestoMovimientoHistorial", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Accion")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Detalle")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("FechaCambio")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MovimientoPresupuestoId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UsuarioNombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ValoresAnterioresJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ValoresNuevosJson")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MovimientoPresupuestoId");
+
+                    b.ToTable("PresupuestoMovimientosHistorial");
                 });
 
             modelBuilder.Entity("OmegaTesoreria.Api.Models.Producto", b =>
@@ -1032,6 +1240,39 @@ namespace backend.Migrations
                     b.Navigation("Producto");
                 });
 
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.MovimientoPresupuesto", b =>
+                {
+                    b.HasOne("OmegaTesoreria.Api.Models.Area", "Area")
+                        .WithMany()
+                        .HasForeignKey("AreaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OmegaTesoreria.Api.Models.Caja", "Caja")
+                        .WithMany()
+                        .HasForeignKey("CajaId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("OmegaTesoreria.Api.Models.Operacion", "OperacionTesoreria")
+                        .WithMany()
+                        .HasForeignKey("OperacionTesoreriaId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("OmegaTesoreria.Api.Models.PresupuestoArea", "PresupuestoArea")
+                        .WithMany("Movimientos")
+                        .HasForeignKey("PresupuestoAreaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Area");
+
+                    b.Navigation("Caja");
+
+                    b.Navigation("OperacionTesoreria");
+
+                    b.Navigation("PresupuestoArea");
+                });
+
             modelBuilder.Entity("OmegaTesoreria.Api.Models.Operacion", b =>
                 {
                     b.HasOne("OmegaTesoreria.Api.Models.Caja", "CajaDestino")
@@ -1082,6 +1323,39 @@ namespace backend.Migrations
                     b.Navigation("Pedido");
                 });
 
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.PresupuestoArea", b =>
+                {
+                    b.HasOne("OmegaTesoreria.Api.Models.Area", "Area")
+                        .WithMany()
+                        .HasForeignKey("AreaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Area");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.PresupuestoEvidencia", b =>
+                {
+                    b.HasOne("OmegaTesoreria.Api.Models.MovimientoPresupuesto", "MovimientoPresupuesto")
+                        .WithMany("Evidencias")
+                        .HasForeignKey("MovimientoPresupuestoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("MovimientoPresupuesto");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.PresupuestoMovimientoHistorial", b =>
+                {
+                    b.HasOne("OmegaTesoreria.Api.Models.MovimientoPresupuesto", "MovimientoPresupuesto")
+                        .WithMany("HistorialModificaciones")
+                        .HasForeignKey("MovimientoPresupuestoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("MovimientoPresupuesto");
+                });
+
             modelBuilder.Entity("OmegaTesoreria.Api.Models.Producto", b =>
                 {
                     b.HasOne("OmegaTesoreria.Api.Models.Area", "Area")
@@ -1107,6 +1381,25 @@ namespace backend.Migrations
                     b.Navigation("Caja");
 
                     b.Navigation("DenominacionAsociada");
+                });
+
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.UsuarioRol", b =>
+                {
+                    b.HasOne("OmegaTesoreria.Api.Models.RolPersonalizado", "RolPersonalizado")
+                        .WithMany("UsuarioRoles")
+                        .HasForeignKey("RolPersonalizadoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OmegaTesoreria.Api.Models.User", "Usuario")
+                        .WithMany("UsuarioRoles")
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RolPersonalizado");
+
+                    b.Navigation("Usuario");
                 });
 
             modelBuilder.Entity("OmegaTesoreria.Api.Models.VentaPresentacion", b =>
@@ -1150,6 +1443,13 @@ namespace backend.Migrations
                     b.Navigation("Detalles");
                 });
 
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.MovimientoPresupuesto", b =>
+                {
+                    b.Navigation("Evidencias");
+
+                    b.Navigation("HistorialModificaciones");
+                });
+
             modelBuilder.Entity("OmegaTesoreria.Api.Models.Operacion", b =>
                 {
                     b.Navigation("Detalles");
@@ -1162,31 +1462,19 @@ namespace backend.Migrations
                     b.Navigation("Pagos");
                 });
 
-            modelBuilder.Entity("OmegaTesoreria.Api.Models.UsuarioRol", b =>
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.PresupuestoArea", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
+                    b.Navigation("Movimientos");
+                });
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.RolPersonalizado", b =>
+                {
+                    b.Navigation("UsuarioRoles");
+                });
 
-                    b.Property<DateTime>("FechaAsignacion")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("RolPersonalizadoId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("UsuarioId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RolPersonalizadoId");
-
-                    b.HasIndex("UsuarioId", "RolPersonalizadoId")
-                        .IsUnique();
-
-                    b.ToTable("UsuarioRoles");
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.User", b =>
+                {
+                    b.Navigation("UsuarioRoles");
                 });
 
             modelBuilder.Entity("OmegaTesoreria.Api.Models.Venta", b =>
@@ -1199,35 +1487,6 @@ namespace backend.Migrations
             modelBuilder.Entity("OmegaTesoreria.Api.Models.VentaProducto", b =>
                 {
                     b.Navigation("Presentaciones");
-                });
-
-            modelBuilder.Entity("OmegaTesoreria.Api.Models.UsuarioRol", b =>
-                {
-                    b.HasOne("OmegaTesoreria.Api.Models.RolPersonalizado", "RolPersonalizado")
-                        .WithMany("UsuarioRoles")
-                        .HasForeignKey("RolPersonalizadoId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("OmegaTesoreria.Api.Models.User", "Usuario")
-                        .WithMany("UsuarioRoles")
-                        .HasForeignKey("UsuarioId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("RolPersonalizado");
-
-                    b.Navigation("Usuario");
-                });
-
-            modelBuilder.Entity("OmegaTesoreria.Api.Models.RolPersonalizado", b =>
-                {
-                    b.Navigation("UsuarioRoles");
-                });
-
-            modelBuilder.Entity("OmegaTesoreria.Api.Models.User", b =>
-                {
-                    b.Navigation("UsuarioRoles");
                 });
 #pragma warning restore 612, 618
         }

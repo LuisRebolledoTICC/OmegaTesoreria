@@ -361,3 +361,74 @@ export interface ImportarExcelPreview {
   totalErrores: number;
   areaNombre?: string;
 }
+
+// --- MÓDULO PRESUPUESTOS POR ÁREA ---
+export interface PresupuestoAreaResumen {
+  areaId: number;
+  areaNombre: string;
+  areaDescripcion?: string | null;
+  areaActiva: boolean;
+  coordinadorId?: number | null;
+  coordinadorNombre?: string | null;
+  totalRecibido: number;
+  totalGastado: number;
+  totalDevuelto: number;
+  totalAjustes: number;
+  saldoDisponible: number;
+  ultimaActualizacion?: string | null;
+  totalMovimientos: number;
+}
+
+export interface PresupuestoEvidencia {
+  id: number;
+  nombreArchivo: string;
+  contentType: string;
+  datosBase64: string;
+  fechaSubida: string;
+}
+
+export interface PresupuestoEvidenciaInput {
+  nombreArchivo: string;
+  contentType: string;
+  datosBase64: string;
+}
+
+export interface PresupuestoMovimientoHistorial {
+  id: number;
+  accion: string;
+  usuarioNombre: string;
+  fechaCambio: string;
+  valoresAnterioresJson?: string | null;
+  valoresNuevosJson?: string | null;
+  detalle?: string | null;
+}
+
+export interface MovimientoPresupuesto {
+  id: number;
+  areaId: number;
+  areaNombre: string;
+  tipoMovimiento: 'ENTREGA' | 'EGRESO' | 'DEVOLUCION' | 'AJUSTE';
+  estado: 'VIGENTE' | 'CANCELADO';
+  importe: number;
+  fechaMovimiento: string;
+  concepto: string;
+  descripcion?: string | null;
+  cajaId?: number | null;
+  cajaNombre?: string | null;
+  operacionTesoreriaId?: number | null;
+  usuarioId: number;
+  usuarioNombre: string;
+  fechaRegistro: string;
+  editadoPor?: string | null;
+  fechaUltimaEdicion?: string | null;
+  canceladoPor?: string | null;
+  fechaCancelacion?: string | null;
+  motivoCancelacion?: string | null;
+  evidencias: PresupuestoEvidencia[];
+  historialModificaciones: PresupuestoMovimientoHistorial[];
+}
+
+export interface PresupuestoAreaDetalle {
+  resumen: PresupuestoAreaResumen;
+  movimientos: MovimientoPresupuesto[];
+}

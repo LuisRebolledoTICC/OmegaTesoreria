@@ -8,7 +8,8 @@ import {
   RotateCcw,
   Search,
   AlertCircle,
-  Coins
+  Coins,
+  PiggyBank
 } from 'lucide-react';
 import { Caja, Operacion } from '../types';
 import { api } from '../services/api';
@@ -22,7 +23,7 @@ interface OperacionesViewProps {
 export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOperationCompleted }) => {
   const { user, isAdmin, canOperate, canAccessModule } = useAuth();
   const [selectedCajaId, setSelectedCajaId] = useState<number | ''>('');
-  const [operacionModal, setOperacionModal] = useState<'entrada' | 'salida' | 'transferencia' | null>(null);
+  const [operacionModal, setOperacionModal] = useState<'entrada' | 'salida' | 'transferencia' | 'presupuesto' | null>(null);
 
   // Form states
   const [cajaOrigenId, setCajaOrigenId] = useState<number>(0);
@@ -33,6 +34,14 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
   const [observaciones, setObservaciones] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Asignar presupuesto a área
+  const [areasPresupuesto, setAreasPresupuesto] = useState<{ id: number; nombre: string }[]>([]);
+  const [areaDestinoId, setAreaDestinoId] = useState<number>(0);
+  const [fechaPresupuesto, setFechaPresupuesto] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [loadingAreas, setLoadingAreas] = useState(false);
+
+  const canAsignarPresupuesto = isAdmin || canAccessModule('presupuestos_asignar') || canAccessModule('presupuestos_administrar');
 
   // Reversion modal
   const [anulandoOpId, setAnulandoOpId] = useState<number | null>(null);
@@ -69,19 +78,35 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
 
   const cajaActivaSeleccionada = selectedCajaId ? cajas.find(c => c.id === selectedCajaId) : null;
 
-  const openModal = (tipo: 'entrada' | 'salida' | 'transferencia') => {
+  const openModal = async (tipo: 'entrada' | 'salida' | 'transferencia' | 'presupuesto') => {
     setOperacionModal(tipo);
     setError(null);
     setImporte(0);
     setConcepto('');
     setDescripcion('');
     setObservaciones('');
+    setFechaPresupuesto(new Date().toISOString().slice(0, 10));
 
     const defaultCaja = selectedCajaId ? Number(selectedCajaId) : (cajas.find(c => c.activa)?.id || 0);
     const otherCaja = cajas.filter(c => c.activa && c.id !== defaultCaja)[0]?.id || defaultCaja;
 
     setCajaOrigenId(defaultCaja);
     setCajaDestinoId(tipo === 'transferencia' ? otherCaja : defaultCaja);
+
+    if (tipo === 'presupuesto') {
+      try {
+        setLoadingAreas(true);
+        const list = await api.getAreasActivasPresupuesto();
+        setAreasPresupuesto(list);
+        if (list.length > 0) {
+          setAreaDestinoId(list[0].id);
+        }
+      } catch (err: any) {
+        setError(err.message || 'No se pudieron cargar las áreas activas.');
+      } finally {
+        setLoadingAreas(false);
+      }
+    }
   };
 
   const handleSubmitOperacion = async (e: React.FormEvent) => {
@@ -121,6 +146,17 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
           cajaDestinoId,
           importe: Number(importe),
           observaciones: observaciones.trim() || undefined,
+        });
+      } else if (operacionModal === 'presupuesto') {
+        if (!cajaOrigenId) throw new Error('Selecciona una caja de origen.');
+        if (!areaDestinoId) throw new Error('Selecciona un área de destino.');
+        if (!fechaPresupuesto) throw new Error('Selecciona la fecha de la entrega.');
+        await api.asignarPresupuesto({
+          cajaOrigenId,
+          areaDestinoId,
+          importe: Number(importe),
+          fecha: new Date(`${fechaPresupuesto}T12:00:00Z`).toISOString(),
+          descripcion: observaciones.trim() || undefined,
         });
       }
 
@@ -187,6 +223,15 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
               <ArrowLeftRight className="w-4 h-4" />
               <span>Transferencia</span>
             </button>
+            {canAsignarPresupuesto && (
+              <button
+                onClick={() => openModal('presupuesto')}
+                className="px-3.5 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-lg text-xs flex items-center space-x-1.5 transition shadow-xs cursor-pointer"
+              >
+                <PiggyBank className="w-4 h-4" />
+                <span>Asignar presupuesto a área</span>
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -374,7 +419,7 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
                     <span className="text-slate-400">Caja(s):</span>
                     <span className="font-semibold text-slate-800 text-right">
                       {op.tipoOperacion === 'TRANSFERENCIA'
-                        ? `${op.cajaOrigenNombre} ➔ ${op.cajaDestinoNombre}`
+                        ? `${op.cajaOrigenNombre || 'Presupuesto Área'} ➔ ${op.cajaDestinoNombre || 'Presupuesto Área'}`
                         : op.cajaDestinoNombre || op.cajaOrigenNombre || '-'}
                     </span>
                   </div>
@@ -458,7 +503,7 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
                     <td className="py-3 px-4 font-semibold text-slate-900">
                       {op.tipoOperacion === 'TRANSFERENCIA' ? (
                         <span>
-                          {op.cajaOrigenNombre} ➔ {op.cajaDestinoNombre}
+                          {op.cajaOrigenNombre || 'Presupuesto Área'} ➔ {op.cajaDestinoNombre || 'Presupuesto Área'}
                         </span>
                       ) : (
                         op.cajaDestinoNombre || op.cajaOrigenNombre || '-'
@@ -527,6 +572,8 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
                   ? 'bg-emerald-800'
                   : operacionModal === 'salida'
                   ? 'bg-rose-800'
+                  : operacionModal === 'presupuesto'
+                  ? 'bg-orange-600'
                   : 'bg-blue-800'
               }`}
             >
@@ -536,11 +583,15 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
                     ? 'Registrar Entrada de Dinero'
                     : operacionModal === 'salida'
                     ? 'Registrar Salida de Efectivo'
+                    : operacionModal === 'presupuesto'
+                    ? 'Asignar Presupuesto a Área'
                     : 'Transferencia entre Cajas'}
                 </h3>
                 <p className="text-xs text-white/80">
                   {operacionModal === 'transferencia'
                     ? 'El patrimonio total de tesorería se mantiene idéntico.'
+                    : operacionModal === 'presupuesto'
+                    ? 'Transferencia interna desde una caja hacia el presupuesto disponible de un área.'
                     : 'Afectará el saldo de la caja y el patrimonio consolidado.'}
                 </p>
               </div>
@@ -617,6 +668,53 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
                         <option key={c.id} value={c.id}>{c.nombre}</option>
                       ))}
                     </select>
+                  </div>
+                </div>
+              )}
+
+              {operacionModal === 'presupuesto' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Caja de Origen *</label>
+                    <select
+                      value={cajaOrigenId}
+                      onChange={(e) => setCajaOrigenId(Number(e.target.value))}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                    >
+                      {cajas.filter(c => c.activa).map(c => (
+                        <option key={c.id} value={c.id}>{c.nombre} (Disp: {formatMoney(c.saldoActual)})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Área de Destino *</label>
+                    {loadingAreas ? (
+                      <p className="text-xs text-slate-500 py-2">Cargando áreas activas...</p>
+                    ) : areasPresupuesto.length === 0 ? (
+                      <p className="text-xs text-red-600 py-2">No hay áreas activas disponibles.</p>
+                    ) : (
+                      <select
+                        value={areaDestinoId}
+                        onChange={(e) => setAreaDestinoId(Number(e.target.value))}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                      >
+                        {areasPresupuesto.map(a => (
+                          <option key={a.id} value={a.id}>{a.nombre}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Fecha *</label>
+                    <input
+                      type="date"
+                      required
+                      value={fechaPresupuesto}
+                      onChange={(e) => setFechaPresupuesto(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                    />
                   </div>
                 </div>
               )}

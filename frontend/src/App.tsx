@@ -13,6 +13,7 @@ import { RespaldosView } from './pages/RespaldosView';
 import { VentasView } from './pages/VentasView';
 import { AreasView } from './pages/AreasView';
 import { InventariosView } from './pages/InventariosView';
+import { PresupuestosView } from './pages/PresupuestosView';
 import { Caja, DashboardSummary } from './types';
 import { api } from './services/api';
 import { Lock } from 'lucide-react';
@@ -23,6 +24,7 @@ const ORDERED_TABS: ActiveTab[] = [
   'cajas',
   'conteo',
   'operaciones',
+  'presupuestos',
   'areas',
   'inventarios',
   'reportes',
@@ -34,6 +36,8 @@ const MainLayout: React.FC = () => {
   const canAccessTab = (tab: ActiveTab) =>
     tab === 'inventarios'
       ? canAccessModule('inventarios') || canAccessModule('inventarios_ver_todos')
+      : tab === 'presupuestos'
+      ? canAccessModule('presupuestos') || canAccessModule('presupuestos_ver_todos') || canAccessModule('presupuestos_administrar')
       : canAccessModule(tab);
   const availableTabs = ORDERED_TABS.filter((t) => canAccessTab(t));
   const firstAvailableTab = availableTabs[0] || null;
@@ -118,6 +122,7 @@ const MainLayout: React.FC = () => {
     cajas: 'Administración de Cajas',
     conteo: 'Conteo Físico de Efectivo',
     operaciones: 'Movimientos por Cada Caja',
+    presupuestos: 'Presupuestos por Área',
     areas: 'Administración de Áreas',
     inventarios: 'Control de Inventarios',
     reportes: 'Reportes y Exportación',
@@ -189,6 +194,13 @@ const MainLayout: React.FC = () => {
             <OperacionesView
               cajas={cajas}
               onOperationCompleted={loadData}
+            />
+          )}
+
+          {currentTab === 'presupuestos' && canAccessTab('presupuestos') && (
+            <PresupuestosView
+              cajas={cajas}
+              onBalanceChanged={loadData}
             />
           )}
 

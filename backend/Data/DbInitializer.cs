@@ -19,6 +19,7 @@ public static class DbInitializer
             await AddColumnIfNotExistsAsync(context, "Cajas", "Tipo", "TEXT NOT NULL DEFAULT 'EFECTIVO'");
             await EnsureSqliteAreasInventariosTablesAsync(context);
             await EnsureSqliteUsuarioRolesTableAsync(context);
+            await EnsureSqlitePresupuestosTablesAsync(context);
         }
         else
         {
@@ -36,7 +37,7 @@ public static class DbInitializer
                     Nombre = "Administrador",
                     Descripcion = "Control total del sistema, administración de usuarios, roles, cajas, ventas, áreas, inventarios y auditoría.",
                     EsSistema = true,
-                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"conteo\",\"operaciones\",\"ventas\",\"reportes\",\"usuarios\",\"entradas\",\"areas\",\"inventarios\",\"areas_crear\",\"areas_editar\",\"areas_desactivar\",\"areas_coordinador\",\"areas_integrantes\",\"inventarios_ver_todos\",\"inventarios_registrar\",\"inventarios_editar\",\"inventarios_eliminar\",\"inventarios_fisico\",\"inventarios_historial\",\"inventarios_exportar\"]",
+                    ModulosPermitidosJson = "[\"dashboard\",\"cajas\",\"conteo\",\"operaciones\",\"ventas\",\"reportes\",\"usuarios\",\"entradas\",\"areas\",\"inventarios\",\"areas_crear\",\"areas_editar\",\"areas_desactivar\",\"areas_coordinador\",\"areas_integrantes\",\"inventarios_ver_todos\",\"inventarios_registrar\",\"inventarios_editar\",\"inventarios_eliminar\",\"inventarios_fisico\",\"inventarios_historial\",\"inventarios_exportar\",\"presupuestos\",\"presupuestos_ver_todos\",\"presupuestos_egresos_registrar\",\"presupuestos_egresos_editar\",\"presupuestos_egresos_cancelar\",\"presupuestos_historial\",\"presupuestos_asignar\",\"presupuestos_devolver\",\"presupuestos_ajustes\",\"presupuestos_administrar\"]",
                     FechaCreacion = DateTime.UtcNow
                 },
                 new()
@@ -63,7 +64,7 @@ public static class DbInitializer
         {
             // Asegurar que los módulos nuevos estén habilitados en los roles base si no los tenían
             var roles = await context.RolesPersonalizados.ToListAsync();
-            var adminExtras = new[] { "ventas", "entradas", "areas", "inventarios", "areas_crear", "areas_editar", "areas_desactivar", "areas_coordinador", "areas_integrantes", "inventarios_ver_todos", "inventarios_registrar", "inventarios_editar", "inventarios_eliminar", "inventarios_fisico", "inventarios_historial", "inventarios_exportar" };
+            var adminExtras = new[] { "ventas", "entradas", "areas", "inventarios", "areas_crear", "areas_editar", "areas_desactivar", "areas_coordinador", "areas_integrantes", "inventarios_ver_todos", "inventarios_registrar", "inventarios_editar", "inventarios_eliminar", "inventarios_fisico", "inventarios_historial", "inventarios_exportar", "presupuestos", "presupuestos_ver_todos", "presupuestos_egresos_registrar", "presupuestos_egresos_editar", "presupuestos_egresos_cancelar", "presupuestos_historial", "presupuestos_asignar", "presupuestos_devolver", "presupuestos_ajustes", "presupuestos_administrar" };
             var tesoreroExtras = new[] { "ventas", "entradas", "areas", "inventarios", "areas_integrantes", "inventarios_registrar", "inventarios_editar", "inventarios_eliminar", "inventarios_fisico", "inventarios_historial", "inventarios_exportar" };
             var consultaExtras = new[] { "ventas", "areas", "inventarios", "inventarios_historial" };
 
@@ -350,6 +351,78 @@ public static class DbInitializer
                 NombreProducto TEXT NOT NULL,
                 UnidadMedida TEXT NOT NULL,
                 Cantidad REAL NOT NULL
+            );"
+        };
+
+        try
+        {
+            foreach (var sql in statements)
+            {
+                await context.Database.ExecuteSqlRawAsync(sql);
+            }
+        }
+        catch { }
+    }
+
+    private static async Task EnsureSqlitePresupuestosTablesAsync(AppDbContext context)
+    {
+        var statements = new[]
+        {
+            @"CREATE TABLE IF NOT EXISTS PresupuestosArea (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                AreaId INTEGER NOT NULL REFERENCES Areas(Id) ON DELETE CASCADE,
+                SaldoDisponible REAL NOT NULL DEFAULT 0,
+                TotalRecibido REAL NOT NULL DEFAULT 0,
+                TotalGastado REAL NOT NULL DEFAULT 0,
+                TotalDevuelto REAL NOT NULL DEFAULT 0,
+                TotalAjustes REAL NOT NULL DEFAULT 0,
+                FechaCreacion TEXT NOT NULL,
+                FechaActualizacion TEXT NOT NULL
+            );",
+            @"CREATE UNIQUE INDEX IF NOT EXISTS IX_PresupuestosArea_AreaId ON PresupuestosArea(AreaId);",
+            @"CREATE TABLE IF NOT EXISTS MovimientosPresupuesto (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                PresupuestoAreaId INTEGER NOT NULL REFERENCES PresupuestosArea(Id) ON DELETE CASCADE,
+                AreaId INTEGER NOT NULL REFERENCES Areas(Id) ON DELETE CASCADE,
+                TipoMovimiento TEXT NOT NULL,
+                Estado TEXT NOT NULL DEFAULT 'VIGENTE',
+                Importe REAL NOT NULL,
+                FechaMovimiento TEXT NOT NULL,
+                Concepto TEXT NOT NULL,
+                Descripcion TEXT NULL,
+                CajaId INTEGER NULL REFERENCES Cajas(Id) ON DELETE SET NULL,
+                CajaNombre TEXT NULL,
+                OperacionTesoreriaId INTEGER NULL REFERENCES Operaciones(Id) ON DELETE SET NULL,
+                UsuarioId INTEGER NOT NULL,
+                UsuarioNombre TEXT NOT NULL,
+                FechaRegistro TEXT NOT NULL,
+                EditadoPor TEXT NULL,
+                FechaUltimaEdicion TEXT NULL,
+                CanceladoPor TEXT NULL,
+                FechaCancelacion TEXT NULL,
+                MotivoCancelacion TEXT NULL
+            );",
+            @"CREATE INDEX IF NOT EXISTS IX_MovimientosPresupuesto_FechaMovimiento ON MovimientosPresupuesto(FechaMovimiento);",
+            @"CREATE INDEX IF NOT EXISTS IX_MovimientosPresupuesto_TipoMovimiento ON MovimientosPresupuesto(TipoMovimiento);",
+            @"CREATE INDEX IF NOT EXISTS IX_MovimientosPresupuesto_Estado ON MovimientosPresupuesto(Estado);",
+            @"CREATE TABLE IF NOT EXISTS PresupuestoEvidencias (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                MovimientoPresupuestoId INTEGER NOT NULL REFERENCES MovimientosPresupuesto(Id) ON DELETE CASCADE,
+                NombreArchivo TEXT NOT NULL,
+                ContentType TEXT NOT NULL,
+                DatosBase64 TEXT NOT NULL,
+                FechaSubida TEXT NOT NULL
+            );",
+            @"CREATE TABLE IF NOT EXISTS PresupuestoMovimientosHistorial (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                MovimientoPresupuestoId INTEGER NOT NULL REFERENCES MovimientosPresupuesto(Id) ON DELETE CASCADE,
+                Accion TEXT NOT NULL,
+                UsuarioId INTEGER NOT NULL,
+                UsuarioNombre TEXT NOT NULL,
+                FechaCambio TEXT NOT NULL,
+                ValoresAnterioresJson TEXT NULL,
+                ValoresNuevosJson TEXT NULL,
+                Detalle TEXT NULL
             );"
         };
 

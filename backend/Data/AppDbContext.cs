@@ -37,6 +37,12 @@ public class AppDbContext : DbContext, IDataProtectionKeyContext
     public DbSet<Inventario> Inventarios => Set<Inventario>();
     public DbSet<InventarioDetalle> InventarioDetalles => Set<InventarioDetalle>();
 
+    // Módulo Presupuestos por Área
+    public DbSet<PresupuestoArea> PresupuestosArea => Set<PresupuestoArea>();
+    public DbSet<MovimientoPresupuesto> MovimientosPresupuesto => Set<MovimientoPresupuesto>();
+    public DbSet<PresupuestoEvidencia> PresupuestoEvidencias => Set<PresupuestoEvidencia>();
+    public DbSet<PresupuestoMovimientoHistorial> PresupuestoMovimientosHistorial => Set<PresupuestoMovimientoHistorial>();
+
     // Persistencia de claves criptográficas de ASP.NET Core Data Protection
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -74,6 +80,14 @@ public class AppDbContext : DbContext, IDataProtectionKeyContext
             // Inventarios en SQLite
             modelBuilder.Entity<Producto>().Property(p => p.CantidadActual).HasConversion<double>();
             modelBuilder.Entity<InventarioDetalle>().Property(d => d.Cantidad).HasConversion<double>();
+
+            // Presupuestos en SQLite
+            modelBuilder.Entity<PresupuestoArea>().Property(p => p.SaldoDisponible).HasConversion<double>();
+            modelBuilder.Entity<PresupuestoArea>().Property(p => p.TotalRecibido).HasConversion<double>();
+            modelBuilder.Entity<PresupuestoArea>().Property(p => p.TotalGastado).HasConversion<double>();
+            modelBuilder.Entity<PresupuestoArea>().Property(p => p.TotalDevuelto).HasConversion<double>();
+            modelBuilder.Entity<PresupuestoArea>().Property(p => p.TotalAjustes).HasConversion<double>();
+            modelBuilder.Entity<MovimientoPresupuesto>().Property(m => m.Importe).HasConversion<double>();
         }
         else
         {
@@ -103,6 +117,14 @@ public class AppDbContext : DbContext, IDataProtectionKeyContext
             // Inventarios en PostgreSQL
             modelBuilder.Entity<Producto>().Property(p => p.CantidadActual).HasPrecision(18, 4);
             modelBuilder.Entity<InventarioDetalle>().Property(d => d.Cantidad).HasPrecision(18, 4);
+
+            // Presupuestos en PostgreSQL
+            modelBuilder.Entity<PresupuestoArea>().Property(p => p.SaldoDisponible).HasPrecision(18, 2);
+            modelBuilder.Entity<PresupuestoArea>().Property(p => p.TotalRecibido).HasPrecision(18, 2);
+            modelBuilder.Entity<PresupuestoArea>().Property(p => p.TotalGastado).HasPrecision(18, 2);
+            modelBuilder.Entity<PresupuestoArea>().Property(p => p.TotalDevuelto).HasPrecision(18, 2);
+            modelBuilder.Entity<PresupuestoArea>().Property(p => p.TotalAjustes).HasPrecision(18, 2);
+            modelBuilder.Entity<MovimientoPresupuesto>().Property(m => m.Importe).HasPrecision(18, 2);
         }
 
         // Relaciones
@@ -255,5 +277,56 @@ public class AppDbContext : DbContext, IDataProtectionKeyContext
         modelBuilder.Entity<Auditoria>().HasIndex(a => a.FechaHora);
         modelBuilder.Entity<Area>().HasIndex(a => a.Nombre).IsUnique();
         modelBuilder.Entity<Inventario>().HasIndex(i => i.FechaInventario);
+
+        // ========== Relaciones Presupuestos por Área ==========
+        modelBuilder.Entity<PresupuestoArea>()
+            .HasOne(p => p.Area)
+            .WithMany()
+            .HasForeignKey(p => p.AreaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<PresupuestoArea>()
+            .HasIndex(p => p.AreaId)
+            .IsUnique();
+
+        modelBuilder.Entity<PresupuestoArea>()
+            .HasMany(p => p.Movimientos)
+            .WithOne(m => m.PresupuestoArea)
+            .HasForeignKey(m => m.PresupuestoAreaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<MovimientoPresupuesto>()
+            .HasOne(m => m.Area)
+            .WithMany()
+            .HasForeignKey(m => m.AreaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<MovimientoPresupuesto>()
+            .HasOne(m => m.Caja)
+            .WithMany()
+            .HasForeignKey(m => m.CajaId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<MovimientoPresupuesto>()
+            .HasOne(m => m.OperacionTesoreria)
+            .WithMany()
+            .HasForeignKey(m => m.OperacionTesoreriaId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<MovimientoPresupuesto>()
+            .HasMany(m => m.Evidencias)
+            .WithOne(e => e.MovimientoPresupuesto)
+            .HasForeignKey(e => e.MovimientoPresupuestoId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<MovimientoPresupuesto>()
+            .HasMany(m => m.HistorialModificaciones)
+            .WithOne(h => h.MovimientoPresupuesto)
+            .HasForeignKey(h => h.MovimientoPresupuestoId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<MovimientoPresupuesto>().HasIndex(m => m.FechaMovimiento);
+        modelBuilder.Entity<MovimientoPresupuesto>().HasIndex(m => m.TipoMovimiento);
+        modelBuilder.Entity<MovimientoPresupuesto>().HasIndex(m => m.Estado);
     }
 }

@@ -99,6 +99,7 @@ else
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITesoreriaService, TesoreriaService>();
 builder.Services.AddScoped<IVentasService, VentasService>();
+builder.Services.AddScoped<IPresupuestosService, PresupuestosService>();
 
 // 3. JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"]

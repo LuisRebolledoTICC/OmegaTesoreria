@@ -22,7 +22,11 @@ import {
   InventarioResumen,
   InventarioDetalle,
   ImportarExcelPreview,
-  ImportarExcelItem
+  ImportarExcelItem,
+  PresupuestoAreaResumen,
+  PresupuestoAreaDetalle,
+  MovimientoPresupuesto,
+  PresupuestoEvidenciaInput
 } from '../types';
 
 // Detect host for LAN, Localhost and Embedded mode
@@ -741,5 +745,109 @@ export const api = {
     link.click();
     link.remove();
     window.URL.revokeObjectURL(url);
+  },
+
+  // --- PRESUPUESTOS ---
+  async getPresupuestosResumen(): Promise<PresupuestoAreaResumen[]> {
+    const res = await fetch(`${API_BASE_URL}/presupuestos`, { headers: getHeaders() });
+    return handleResponse<PresupuestoAreaResumen[]>(res);
+  },
+
+  async getAreasActivasPresupuesto(): Promise<{ id: number; nombre: string }[]> {
+    const res = await fetch(`${API_BASE_URL}/presupuestos/areas-activas`, { headers: getHeaders() });
+    return handleResponse<{ id: number; nombre: string }[]>(res);
+  },
+
+  async getPresupuestoDetalle(areaId: number): Promise<PresupuestoAreaDetalle> {
+    const res = await fetch(`${API_BASE_URL}/presupuestos/area/${areaId}`, { headers: getHeaders() });
+    return handleResponse<PresupuestoAreaDetalle>(res);
+  },
+
+  async asignarPresupuesto(data: {
+    cajaOrigenId: number;
+    areaDestinoId: number;
+    importe: number;
+    fecha: string;
+    descripcion?: string;
+  }): Promise<MovimientoPresupuesto> {
+    const res = await fetch(`${API_BASE_URL}/presupuestos/asignar`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<MovimientoPresupuesto>(res);
+  },
+
+  async registrarEgresoPresupuesto(data: {
+    areaId: number;
+    concepto: string;
+    importe: number;
+    fecha: string;
+    descripcion?: string;
+    evidencias?: PresupuestoEvidenciaInput[];
+  }): Promise<MovimientoPresupuesto> {
+    const res = await fetch(`${API_BASE_URL}/presupuestos/egresos`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<MovimientoPresupuesto>(res);
+  },
+
+  async editarEgresoPresupuesto(
+    id: number,
+    data: {
+      concepto: string;
+      importe: number;
+      fecha: string;
+      descripcion?: string;
+      conservarEvidenciaIds?: number[];
+      nuevasEvidencias?: PresupuestoEvidenciaInput[];
+    }
+  ): Promise<MovimientoPresupuesto> {
+    const res = await fetch(`${API_BASE_URL}/presupuestos/egresos/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<MovimientoPresupuesto>(res);
+  },
+
+  async cancelarEgresoPresupuesto(id: number, motivo?: string): Promise<MovimientoPresupuesto> {
+    const res = await fetch(`${API_BASE_URL}/presupuestos/egresos/${id}/cancelar`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ motivo }),
+    });
+    return handleResponse<MovimientoPresupuesto>(res);
+  },
+
+  async devolverPresupuesto(data: {
+    areaOrigenId: number;
+    cajaDestinoId: number;
+    importe: number;
+    fecha: string;
+    descripcion?: string;
+  }): Promise<MovimientoPresupuesto> {
+    const res = await fetch(`${API_BASE_URL}/presupuestos/devolver`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<MovimientoPresupuesto>(res);
+  },
+
+  async registrarAjustePresupuesto(data: {
+    areaId: number;
+    importe: number;
+    fecha: string;
+    motivo: string;
+  }): Promise<MovimientoPresupuesto> {
+    const res = await fetch(`${API_BASE_URL}/presupuestos/ajustes`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<MovimientoPresupuesto>(res);
   }
 };

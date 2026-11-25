@@ -758,6 +758,9 @@ public class TesoreriaService : ITesoreriaService
             if (opOriginal.Estado == "ANULADA")
                 throw new InvalidOperationException("Esta operación ya fue anulada previamente.");
 
+            if (await _context.MovimientosPresupuesto.AnyAsync(m => m.OperacionTesoreriaId == opOriginal.Id))
+                throw new InvalidOperationException("Las transferencias vinculadas a presupuestos de área deben corregirse mediante devolución o ajuste en el módulo de Presupuestos.");
+
             opOriginal.Estado = "ANULADA";
 
             // Crear operación inversa (REVERSA)

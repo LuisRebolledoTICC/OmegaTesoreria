@@ -54,6 +54,17 @@ const MODULOS_DISPONIBLES = [
   { id: 'inventarios_fisico', nombre: 'Inventarios: Realizar inventarios físicos', descripcion: 'Permite cargar inventarios por fecha mediante Excel o captura' },
   { id: 'inventarios_historial', nombre: 'Inventarios: Consultar historial', descripcion: 'Permite ver inventarios anteriores por fecha' },
   { id: 'inventarios_exportar', nombre: 'Inventarios: Exportar reportes', descripcion: 'Permite descargar inventarios en Excel y PDF' },
+  // Módulo Presupuestos
+  { id: 'presupuestos', nombre: 'Presupuestos: Ver presupuestos', descripcion: 'Permite acceder al módulo Presupuestos y consultar el presupuesto de su propia área' },
+  { id: 'presupuestos_ver_todos', nombre: 'Presupuestos: Ver todas las áreas', descripcion: 'Permite consultar los presupuestos de todas las áreas activas' },
+  { id: 'presupuestos_egresos_registrar', nombre: 'Presupuestos: Registrar egresos', descripcion: 'Permite registrar gastos desde el saldo disponible del área' },
+  { id: 'presupuestos_egresos_editar', nombre: 'Presupuestos: Editar egresos', descripcion: 'Permite modificar egresos registrados recalculando el saldo' },
+  { id: 'presupuestos_egresos_cancelar', nombre: 'Presupuestos: Cancelar egresos', descripcion: 'Permite cancelar egresos devolviendo el importe al saldo del área' },
+  { id: 'presupuestos_historial', nombre: 'Presupuestos: Consultar historial', descripcion: 'Permite consultar el historial completo de movimientos del presupuesto' },
+  { id: 'presupuestos_asignar', nombre: 'Presupuestos: Asignar desde cajas', descripcion: 'Permite entregar presupuesto a un área desde Movimientos por Caja' },
+  { id: 'presupuestos_devolver', nombre: 'Presupuestos: Devolver dinero a cajas', descripcion: 'Permite registrar devoluciones de presupuesto del área hacia una caja' },
+  { id: 'presupuestos_ajustes', nombre: 'Presupuestos: Realizar ajustes de saldo', descripcion: 'Permite realizar ajustes positivos o negativos de saldo con motivo obligatorio' },
+  { id: 'presupuestos_administrar', nombre: 'Presupuestos: Administrar presupuestos', descripcion: 'Acceso total a todas las operaciones del módulo Presupuestos' },
 ];
 
 export const UsuariosView: React.FC = () => {

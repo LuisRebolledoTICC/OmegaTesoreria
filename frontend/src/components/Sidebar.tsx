@@ -11,6 +11,7 @@ import {
   ShoppingBag,
   Building2,
   Package,
+  PiggyBank,
   X,
   UserCog,
   ChevronUp
@@ -24,6 +25,7 @@ export type ActiveTab =
   | 'cajas'
   | 'conteo'
   | 'operaciones'
+  | 'presupuestos'
   | 'areas'
   | 'inventarios'
   | 'reportes'
@@ -94,6 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'cajas' as ActiveTab, label: 'Cajas de Tesorería', icon: Wallet, show: canAccessModule('cajas') },
     { id: 'conteo' as ActiveTab, label: 'Conteo de Efectivo', icon: Calculator, show: canAccessModule('conteo') },
     { id: 'operaciones' as ActiveTab, label: 'Movimientos por Caja', icon: ArrowLeftRight, show: canAccessModule('operaciones') },
+    { id: 'presupuestos' as ActiveTab, label: 'Presupuestos', icon: PiggyBank, show: canAccessModule('presupuestos') || canAccessModule('presupuestos_ver_todos') || canAccessModule('presupuestos_administrar') },
     { id: 'areas' as ActiveTab, label: 'Áreas', icon: Building2, show: canAccessModule('areas') },
     { id: 'inventarios' as ActiveTab, label: 'Inventarios', icon: Package, show: canAccessModule('inventarios') || canAccessModule('inventarios_ver_todos') },
     { id: 'reportes' as ActiveTab, label: 'Reportes y Excel', icon: FileSpreadsheet, show: canAccessModule('reportes') },

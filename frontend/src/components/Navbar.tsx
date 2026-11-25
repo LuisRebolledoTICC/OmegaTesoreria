@@ -59,7 +59,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Network & Local Host status pill */}
         <div className="hidden lg:flex items-center space-x-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-full text-xs font-medium text-emerald-800">
-          <Wifi className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
+          <Wifi className="w-3.5 h-3.5 text-emerald-600" />
           <span>Sistema Activo</span>
         </div>
 

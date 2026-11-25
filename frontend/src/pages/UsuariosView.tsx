@@ -686,14 +686,6 @@ export const UsuariosView: React.FC = () => {
                         ))}
                       </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Creación:</span>
-                      <span>{new Date(u.fechaCreacion).toLocaleDateString('es-MX')}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Último acceso:</span>
-                      <span className="text-right">{u.ultimoAcceso ? new Date(u.ultimoAcceso).toLocaleString('es-MX') : 'Nunca'}</span>
-                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
@@ -880,34 +872,19 @@ export const UsuariosView: React.FC = () => {
                       )}
                     </button>
                   </th>
-                  <th className="p-3">
-                    <button
-                      type="button"
-                      onClick={() => handleSort('fechaCreacion')}
-                      className="inline-flex items-center space-x-1 hover:text-slate-950 cursor-pointer"
-                    >
-                      <span>Fecha de Creación</span>
-                      {sortField === 'fechaCreacion' ? (
-                        sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-amber-600" /> : <ArrowDown className="w-3.5 h-3.5 text-amber-600" />
-                      ) : (
-                        <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
-                      )}
-                    </button>
-                  </th>
-                  <th className="p-3">Último Acceso</th>
                   <th className="p-3 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="p-6 text-center text-slate-500">
+                    <td colSpan={6} className="p-6 text-center text-slate-500">
                       Cargando usuarios...
                     </td>
                   </tr>
                 ) : paginatedUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-6 text-center text-slate-500">
+                    <td colSpan={6} className="p-6 text-center text-slate-500">
                       No se encontraron usuarios con los filtros aplicados.
                     </td>
                   </tr>
@@ -935,8 +912,6 @@ export const UsuariosView: React.FC = () => {
                           {u.activo ? 'Activo' : 'Inactivo'}
                         </span>
                       </td>
-                      <td className="p-3 text-slate-600">{new Date(u.fechaCreacion).toLocaleDateString('es-MX')}</td>
-                      <td className="p-3 text-slate-600">{u.ultimoAcceso ? new Date(u.ultimoAcceso).toLocaleString('es-MX') : 'Nunca'}</td>
                       <td className="p-3">
                         <div className="flex items-center justify-center space-x-1.5">
                           <button
@@ -1133,7 +1108,7 @@ export const UsuariosView: React.FC = () => {
 
       {/* Modal: Crear Usuario */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
             <h3 className="text-lg font-bold text-slate-900 mb-1">Registrar Nuevo Usuario</h3>
             <p className="text-xs text-slate-500 mb-4">Ingresa las credenciales y asigna el rol correspondiente.</p>
@@ -1237,7 +1212,7 @@ export const UsuariosView: React.FC = () => {
 
       {/* Modal: Cambiar Contraseña */}
       {userForPassword && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
             <div className="flex items-center space-x-3 mb-3">
               <div className="p-2.5 bg-amber-100 text-amber-800 rounded-xl">
@@ -1322,7 +1297,7 @@ export const UsuariosView: React.FC = () => {
 
       {/* Modal: Editar Usuario */}
       {userForEdit && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
             <h3 className="text-base font-bold text-slate-900 mb-1">Editar Datos del Usuario</h3>
             <p className="text-xs text-slate-500 mb-4">
@@ -1414,7 +1389,7 @@ export const UsuariosView: React.FC = () => {
 
       {/* Modal: Confirmar Eliminación Permanente de Usuario */}
       {userForDelete && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-950/60 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-red-200">
             <div className="flex items-center space-x-3 mb-3">
               <div className="p-2.5 bg-red-100 text-red-700 rounded-xl shrink-0">
@@ -1469,7 +1444,7 @@ export const UsuariosView: React.FC = () => {
 
       {/* Modal: Crear / Configurar Rol */}
       {showRolModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[90dvh] overflow-y-auto">
             <h3 className="text-base font-bold text-slate-900 mb-1">
               {rolEdit ? `Configurar Permisos: ${rolEdit.nombre}` : 'Crear Nuevo Rol'}

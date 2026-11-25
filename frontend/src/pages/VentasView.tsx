@@ -976,7 +976,7 @@ export const VentasView: React.FC<VentasViewProps> = ({ cajas, onEntradaRealizad
 
       {/* MODAL: NUEVA VENTA */}
       {showNuevaVentaModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
             <h3 className="text-base font-bold text-slate-900 mb-1">Crear Nueva Venta</h3>
             <p className="text-xs text-slate-500 mb-4">Define el nombre de la jornada y la fecha correspondiente.</p>
@@ -1035,7 +1035,7 @@ export const VentasView: React.FC<VentasViewProps> = ({ cajas, onEntradaRealizad
 
       {/* MODAL: PRODUCTO Y PRESENTACIONES */}
       {showProductoModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[90dvh] overflow-y-auto">
             <h3 className="text-base font-bold text-slate-900 mb-1">
               {prodEditId ? 'Editar Producto' : 'Agregar Producto a esta Venta'}
@@ -1156,7 +1156,7 @@ export const VentasView: React.FC<VentasViewProps> = ({ cajas, onEntradaRealizad
 
       {/* MODAL: NUEVO PEDIDO */}
       {showPedidoModal && ventaDetalle && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
             <h3 className="text-base font-bold text-slate-900 mb-1">
               {pedidoEditId ? `Editar Pedido #${pedidoEditFolio}` : 'Registrar Nuevo Pedido'}
@@ -1359,7 +1359,7 @@ export const VentasView: React.FC<VentasViewProps> = ({ cajas, onEntradaRealizad
 
       {/* MODAL: REALIZAR ENTRADA A TESORERÍA (Sección 8 y 9) */}
       {showEntradaModal && ventaDetalle && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
             <div className="flex items-center space-x-3 mb-3">
               <div className="p-3 bg-emerald-100 text-emerald-800 rounded-xl">

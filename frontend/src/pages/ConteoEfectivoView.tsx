@@ -1130,7 +1130,7 @@ export const ConteoEfectivoView: React.FC<ConteoEfectivoViewProps> = ({
 
       {/* Confirmation Modal (Section 3.4 & 3.5) */}
       {showConfirmModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200">
             <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
               <div>
@@ -1404,7 +1404,7 @@ export const ConteoEfectivoView: React.FC<ConteoEfectivoViewProps> = ({
 
       {/* Modal de Configuración / Creación de Bolsa con Auto-cálculo de Monedas */}
       {showBolsaModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 animate-in fade-in">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-700 to-indigo-800 px-6 py-4 text-white flex items-center justify-between">
@@ -1564,7 +1564,7 @@ export const ConteoEfectivoView: React.FC<ConteoEfectivoViewProps> = ({
       )}
       {/* Modal Directo: Registrar Operación desde Conteo (Entrada / Salida / Ajuste) */}
       {showOperacionDiferenciaModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 animate-in fade-in">
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200">
             {/* Header */}
             <div

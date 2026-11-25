@@ -376,7 +376,7 @@ export const CajasView: React.FC<CajasViewProps> = ({ cajas, onRefresh, onNaviga
 
       {/* Modal: Desglose de Efectivo Físico de la Caja (Sección 10.3) */}
       {selectedCaja && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200 max-h-[90dvh] flex flex-col">
             <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
               <div>
@@ -495,7 +495,7 @@ export const CajasView: React.FC<CajasViewProps> = ({ cajas, onRefresh, onNaviga
 
       {/* Modal: Crear Nueva Caja */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-200">
             <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
               <div>
@@ -627,7 +627,7 @@ export const CajasView: React.FC<CajasViewProps> = ({ cajas, onRefresh, onNaviga
 
       {/* Modal: Registrar Entrada o Salida Rápida (Ideal para transferencias) */}
       {showQuickOpModal && quickOpCaja && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 animate-in fade-in">
           <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-200">
             <div
               className={`p-5 text-white flex items-center justify-between ${

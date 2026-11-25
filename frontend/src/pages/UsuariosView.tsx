@@ -38,6 +38,7 @@ const MODULOS_DISPONIBLES = [
   { id: 'areas_integrantes', nombre: 'Áreas: Administrar integrantes del área', descripcion: 'Permite al coordinador agregar y retirar integrantes de su propia área' },
   // Módulo Inventarios
   { id: 'inventarios', nombre: 'Inventarios: Ver inventario', descripcion: 'Permite consultar el inventario del área asignada' },
+  { id: 'inventarios_ver_todos', nombre: 'Inventarios: Ver todos los inventarios', descripcion: 'Permite consultar los inventarios de todas las áreas activas aunque no tenga un área asignada' },
   { id: 'inventarios_registrar', nombre: 'Inventarios: Registrar productos', descripcion: 'Permite dar de alta nuevos productos en el área' },
   { id: 'inventarios_editar', nombre: 'Inventarios: Editar productos', descripcion: 'Permite modificar nombre, unidad y cantidad de productos' },
   { id: 'inventarios_fisico', nombre: 'Inventarios: Realizar inventarios físicos', descripcion: 'Permite cargar inventarios por fecha mediante Excel o captura' },

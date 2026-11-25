@@ -31,7 +31,11 @@ const ORDERED_TABS: ActiveTab[] = [
 
 const MainLayout: React.FC = () => {
   const { user, canAccessModule, logout } = useAuth();
-  const availableTabs = ORDERED_TABS.filter((t) => canAccessModule(t));
+  const canAccessTab = (tab: ActiveTab) =>
+    tab === 'inventarios'
+      ? canAccessModule('inventarios') || canAccessModule('inventarios_ver_todos')
+      : canAccessModule(tab);
+  const availableTabs = ORDERED_TABS.filter((t) => canAccessTab(t));
   const firstAvailableTab = availableTabs[0] || null;
 
   const [activeTab, setActiveTab] = useState<ActiveTab | null>(() => firstAvailableTab);
@@ -66,7 +70,7 @@ const MainLayout: React.FC = () => {
   // Redirigir automáticamente al primer módulo permitido si no hay pestaña o si se pierde acceso
   useEffect(() => {
     if (user) {
-      if (!activeTab || !canAccessModule(activeTab)) {
+      if (!activeTab || !canAccessTab(activeTab)) {
         if (firstAvailableTab) {
           setActiveTab(firstAvailableTab);
         }
@@ -120,7 +124,7 @@ const MainLayout: React.FC = () => {
     usuarios: 'Administración de Usuarios y Permisos',
   };
 
-  const currentTab = (activeTab && canAccessModule(activeTab) ? activeTab : firstAvailableTab) as ActiveTab;
+  const currentTab = (activeTab && canAccessTab(activeTab) ? activeTab : firstAvailableTab) as ActiveTab;
 
   return (
     <div className="flex h-dvh w-full overflow-hidden bg-slate-50 font-sans print:h-auto print:overflow-visible print:bg-white">
@@ -128,7 +132,7 @@ const MainLayout: React.FC = () => {
       <Sidebar
         activeTab={currentTab}
         setActiveTab={(tab) => {
-          if (canAccessModule(tab)) {
+          if (canAccessTab(tab)) {
             setActiveTab(tab);
           }
         }}
@@ -190,7 +194,7 @@ const MainLayout: React.FC = () => {
 
           {currentTab === 'areas' && canAccessModule('areas') && <AreasView />}
 
-          {currentTab === 'inventarios' && canAccessModule('inventarios') && <InventariosView />}
+          {currentTab === 'inventarios' && canAccessTab('inventarios') && <InventariosView />}
 
           {currentTab === 'reportes' && canAccessModule('reportes') && (
             <ReportesView

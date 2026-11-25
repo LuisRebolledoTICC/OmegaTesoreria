@@ -28,13 +28,17 @@ public class InventariosController : ControllerBase
     private int GetUserId() => int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
     private bool IsAdmin() => User.IsInRole("Administrador");
 
-    // Verifica que el usuario tenga acceso al área (integrante o admin) y que el área esté activa
+    // Verifica que el usuario tenga acceso al área (integrante, coordinador, admin o permiso ver todos) y que el área esté activa
     private async Task<(bool allowed, Area? area)> CheckAreaAccess(int areaId)
     {
         var area = await _context.Areas.FindAsync(areaId);
         if (area == null || !area.Activa) return (false, area);
 
         if (IsAdmin()) return (true, area);
+
+        var userName = GetUserName();
+        if (await _authService.HasPermissionAsync(userName, "inventarios_ver_todos"))
+            return (true, area);
 
         var userId = GetUserId();
         var isIntegrante = await _context.AreaIntegrantes.AnyAsync(ai => ai.AreaId == areaId && ai.UsuarioId == userId);
@@ -43,15 +47,38 @@ public class InventariosController : ControllerBase
         return (isIntegrante || isCoordinador, area);
     }
 
+    private async Task<bool> CanViewInventariosAsync()
+    {
+        if (IsAdmin()) return true;
+        var userName = GetUserName();
+        return await _authService.HasPermissionAsync(userName, "inventarios")
+            || await _authService.HasPermissionAsync(userName, "inventarios_ver_todos");
+    }
+
+    // GET: api/inventarios/areas-activas
+    [HttpGet("areas-activas")]
+    public async Task<IActionResult> GetAreasActivas()
+    {
+        var userName = GetUserName();
+        bool canViewAll = IsAdmin() || await _authService.HasPermissionAsync(userName, "inventarios_ver_todos");
+        if (!canViewAll) return Forbid();
+
+        var areas = await _context.Areas
+            .Where(a => a.Activa)
+            .OrderBy(a => a.Nombre)
+            .Select(a => new { a.Id, a.Nombre })
+            .ToListAsync();
+
+        return Ok(areas);
+    }
+
     // =================== PRODUCTOS ===================
 
     // GET: api/inventarios/productos?areaId=1&search=hojas
     [HttpGet("productos")]
     public async Task<IActionResult> GetProductos([FromQuery] int areaId, [FromQuery] string? search)
     {
-        var userName = GetUserName();
-        var hasPermission = await _authService.HasPermissionAsync(userName, "inventarios");
-        if (!hasPermission) return Forbid();
+        if (!await CanViewInventariosAsync()) return Forbid();
 
         var (allowed, area) = await CheckAreaAccess(areaId);
         if (!allowed) return Forbid();
@@ -171,7 +198,7 @@ public class InventariosController : ControllerBase
     public async Task<IActionResult> GetInventario(int id)
     {
         var userName = GetUserName();
-        var hasPermission = await _authService.HasPermissionAsync(userName, "inventarios");
+        var hasPermission = await _authService.HasPermissionAsync(userName, "inventarios_historial") || IsAdmin();
         if (!hasPermission) return Forbid();
 
         var inventario = await _context.Inventarios
@@ -209,9 +236,7 @@ public class InventariosController : ControllerBase
     [HttpGet("ultimo")]
     public async Task<IActionResult> GetUltimoInventario([FromQuery] int areaId)
     {
-        var userName = GetUserName();
-        var hasPermission = await _authService.HasPermissionAsync(userName, "inventarios");
-        if (!hasPermission) return Forbid();
+        if (!await CanViewInventariosAsync()) return Forbid();
 
         var (allowed, area) = await CheckAreaAccess(areaId);
         if (!allowed) return Forbid();

@@ -581,6 +581,11 @@ export const api = {
   },
 
   // --- INVENTARIOS ---
+  async getAreasActivasInventario(): Promise<{ id: number; nombre: string }[]> {
+    const res = await fetch(`${API_BASE_URL}/inventarios/areas-activas`, { headers: getHeaders() });
+    return handleResponse<{ id: number; nombre: string }[]>(res);
+  },
+
   async getProductosInventario(areaId: number, search?: string): Promise<ProductoInventario[]> {
     const query = new URLSearchParams({ areaId: String(areaId) });
     if (search && search.trim()) query.append('search', search.trim());

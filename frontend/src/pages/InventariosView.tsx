@@ -35,7 +35,7 @@ export const InventariosView: React.FC = () => {
   const { isAdmin, canAccessModule } = useAuth();
 
   // Área activa
-  const [areasActivas, setAreasActivas] = useState<Area[]>([]);
+  const [areasActivas, setAreasActivas] = useState<{ id: number; nombre: string }[]>([]);
   const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null);
   const [selectedAreaNombre, setSelectedAreaNombre] = useState<string>('');
   const [noAreaAssigned, setNoAreaAssigned] = useState(false);
@@ -76,6 +76,7 @@ export const InventariosView: React.FC = () => {
   const [selectedHistorico, setSelectedHistorico] = useState<InventarioDetalle | null>(null);
 
   // Permisos
+  const canVerTodos = isAdmin || canAccessModule('inventarios_ver_todos');
   const canRegistrar = isAdmin || canAccessModule('inventarios_registrar');
   const canEditar = isAdmin || canAccessModule('inventarios_editar');
   const canFisico = isAdmin || canAccessModule('inventarios_fisico');
@@ -93,9 +94,8 @@ export const InventariosView: React.FC = () => {
       try {
         setInitLoading(true);
         setError(null);
-        if (isAdmin) {
-          const allAreas = await api.getAreas();
-          const activas = allAreas.filter((a) => a.activa);
+        if (canVerTodos) {
+          const activas = await api.getAreasActivasInventario();
           setAreasActivas(activas);
           if (activas.length > 0) {
             setSelectedAreaId(activas[0].id);
@@ -121,7 +121,7 @@ export const InventariosView: React.FC = () => {
       }
     };
     initArea();
-  }, [isAdmin]);
+  }, [canVerTodos]);
 
   const loadAreaInventory = async (areaId: number, searchTerm = search) => {
     try {
@@ -352,12 +352,12 @@ export const InventariosView: React.FC = () => {
           <Lock className="w-7 h-7" />
         </div>
         <h3 className="text-lg font-bold text-slate-900 mb-2">
-          {isAdmin ? 'No hay áreas activas registradas' : 'Necesitas un área asignada'}
+          {canVerTodos ? 'No hay áreas activas registradas' : 'Necesitas un área asignada'}
         </h3>
         <p className="text-sm text-slate-600 leading-relaxed">
-          {isAdmin
-            ? 'Crea o activa un área desde el módulo "Áreas" para gestionar su inventario.'
-            : 'Actualmente no estás asignado a ningún área activa. Solicita a un administrador o coordinador que te asigne a tu área para consultar su inventario.'}
+          {canVerTodos
+            ? 'No hay áreas activas disponibles para consultar en este momento.'
+            : 'Actualmente no estás asignado a ningún área activa y no cuentas con permiso para ver todos los inventarios. Solicita a un administrador que te asigne a un área o habilite el permiso correspondiente.'}
         </p>
       </div>
     );
@@ -403,7 +403,7 @@ export const InventariosView: React.FC = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
-            {isAdmin && areasActivas.length > 0 && (
+            {canVerTodos && areasActivas.length > 0 && (
               <select
                 value={selectedAreaId}
                 onChange={(e) => {

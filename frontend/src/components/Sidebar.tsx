@@ -76,7 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'conteo' as ActiveTab, label: 'Conteo de Efectivo', icon: Calculator, show: canAccessModule('conteo') },
     { id: 'operaciones' as ActiveTab, label: 'Movimientos por Caja', icon: ArrowLeftRight, show: canAccessModule('operaciones') },
     { id: 'areas' as ActiveTab, label: 'Áreas', icon: Building2, show: canAccessModule('areas') },
-    { id: 'inventarios' as ActiveTab, label: 'Inventarios', icon: Package, show: canAccessModule('inventarios') },
+    { id: 'inventarios' as ActiveTab, label: 'Inventarios', icon: Package, show: canAccessModule('inventarios') || canAccessModule('inventarios_ver_todos') },
     { id: 'reportes' as ActiveTab, label: 'Reportes y Excel', icon: FileSpreadsheet, show: canAccessModule('reportes') },
     { id: 'usuarios' as ActiveTab, label: 'Usuarios y Permisos', icon: Users, show: canAccessModule('usuarios') },
   ];

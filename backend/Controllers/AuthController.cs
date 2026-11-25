@@ -27,6 +27,39 @@ public class AuthController : ControllerBase
         return Ok(response);
     }
 
+    [HttpGet("users")] // existing endpoint
+    // New endpoints for profile and deletion
+    [HttpGet("perfil")]
+    [Authorize]
+    public async Task<IActionResult> GetPerfil()
+    {
+        var userName = User.Identity?.Name ?? "";
+        var perfil = await _authService.GetPerfilAsync(userName);
+        if (perfil == null) return NotFound();
+        return Ok(perfil);
+    }
+
+    [HttpPut("perfil")]
+    [Authorize]
+    public async Task<IActionResult> UpdatePerfil([FromBody] UpdatePerfilDto request)
+    {
+        var userName = User.Identity?.Name ?? "";
+        var result = await _authService.UpdatePerfilAsync(userName, request);
+        if (!result.Success) return BadRequest(new { message = result.ErrorMessage });
+        // Regenerate token? Frontend can request a new login.
+        return Ok(result.UserDto);
+    }
+
+    [HttpDelete("users/{id}")]
+    [Authorize(Roles = "Administrador")]
+    public async Task<IActionResult> DeleteUser(int id)
+    {
+        var currentUser = User.Identity?.Name ?? "Sistema";
+        var success = await _authService.DeleteUserAsync(id, currentUser);
+        if (!success) return BadRequest(new { message = "No se pudo eliminar el usuario. Puede ser el último administrador o no encontrado." });
+        return Ok(new { message = "Usuario eliminado." });
+    }
+
     [HttpGet("users")]
     [Authorize(Roles = "Administrador")]
     public async Task<IActionResult> GetUsers()

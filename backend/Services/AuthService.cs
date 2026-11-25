@@ -10,6 +10,22 @@ using OmegaTesoreria.Api.Models;
 namespace OmegaTesoreria.Api.Services;
 
 public interface IAuthService
+    {
+        Task<LoginResponse?> LoginAsync(LoginRequest request);
+        Task<List<UserDto>> GetUsersAsync();
+        Task<UserDto?> CreateUserAsync(CreateUserRequest request, string currentUserName);
+        Task<bool> UpdateUserAsync(int id, UpdateUserRequest request, string currentUserName);
+        Task<bool> ToggleUserStatusAsync(int id, string currentUserName);
+        Task<List<RolPersonalizadoDto>> GetRolesAsync();
+        Task<RolPersonalizadoDto?> CreateRolAsync(CreateOrUpdateRolRequest request, string currentUserName);
+        Task<bool> UpdateRolAsync(int id, CreateOrUpdateRolRequest request, string currentUserName);
+        Task<bool> DeleteRolAsync(int id, string currentUserName);
+        Task<bool> HasPermissionAsync(string userName, string modulo);
+        // New methods
+        Task<UserDto?> GetPerfilAsync(string userName);
+        Task<(bool Success, string? ErrorMessage, UserDto? UserDto)> UpdatePerfilAsync(string userName, UpdatePerfilDto dto);
+        Task<bool> DeleteUserAsync(int id, string currentUserName);
+    }
 {
     Task<LoginResponse?> LoginAsync(LoginRequest request);
     Task<List<UserDto>> GetUsersAsync();
@@ -80,8 +96,9 @@ public class AuthService : IAuthService
 
     public async Task<List<UserDto>> GetUsersAsync()
     {
+        // Order alphabetically ignoring case
         return await _context.Users
-            .OrderBy(u => u.UserName)
+            .OrderBy(u => u.UserName.ToLower())
             .Select(u => new UserDto(u.Id, u.UserName, u.Nombre, u.Rol, u.Activo, u.FechaCreacion, u.UltimoAcceso))
             .ToListAsync();
     }

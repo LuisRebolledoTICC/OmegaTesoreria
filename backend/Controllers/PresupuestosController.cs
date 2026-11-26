@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using OmegaTesoreria.Api.DTOs;
+using OmegaTesoreria.Api.Constants;
 using OmegaTesoreria.Api.Services;
 
 namespace OmegaTesoreria.Api.Controllers;
@@ -40,7 +40,7 @@ public class PresupuestosController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetResumen()
     {
-        if (!await HasAnyPermissionAsync("presupuestos", "presupuestos_ver_todos", "presupuestos_administrar"))
+        if (!await HasAnyPermissionAsync(Permissions.PresupuestosConsultarMiArea, Permissions.PresupuestosAdministrar))
             return Forbid();
 
         var data = await _presupuestosService.GetResumenAreasAsync(GetUserId(), GetUserName(), IsAdmin());

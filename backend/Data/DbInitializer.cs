@@ -64,9 +64,9 @@ public static class DbInitializer
         {
             // Asegurar que los módulos nuevos estén habilitados en los roles base si no los tenían
             var roles = await context.RolesPersonalizados.ToListAsync();
-            var adminExtras = new[] { "ventas", "entradas", "areas", "inventarios", "areas_crear", "areas_editar", "areas_desactivar", "areas_coordinador", "areas_integrantes", "inventarios_ver_todos", "inventarios_registrar", "inventarios_editar", "inventarios_eliminar", "inventarios_fisico", "inventarios_historial", "inventarios_exportar", "presupuestos", "presupuestos_ver_todos", "presupuestos_egresos_registrar", "presupuestos_egresos_editar", "presupuestos_egresos_cancelar", "presupuestos_historial", "presupuestos_asignar", "presupuestos_devolver", "presupuestos_ajustes", "presupuestos_administrar" };
-            var tesoreroExtras = new[] { "ventas", "entradas", "areas", "inventarios", "areas_integrantes", "inventarios_registrar", "inventarios_editar", "inventarios_eliminar", "inventarios_fisico", "inventarios_historial", "inventarios_exportar" };
-            var consultaExtras = new[] { "ventas", "areas", "inventarios", "inventarios_historial" };
+            var adminExtras = new[] { "ventas", "entradas", "areas", "inventarios", "areas_crear", "areas_editar", "areas_desactivar", "areas_coordinador", "areas_integrantes", "inventarios_ver_todos", "inventarios_registrar", "inventarios_editar", "inventarios_eliminar", "inventarios_fisico", "inventarios_historial", "inventarios_exportar", "presupuestos", "presupuestos_ver_todos", "presupuestos_egresos_registrar", "presupuestos_egresos_editar", "presupuestos_egresos_cancelar", "presupuestos_historial", "presupuestos_asignar", "presupuestos_devolver", "presupuestos_ajustes", "presupuestos_administrar", "presupuestos_consultar_mi_area", "presupuestos_consultar_todos", "cajas_editar_movimientos" }
+            var tesoreroExtras = new[] { "ventas", "entradas", "areas", "inventarios", "areas_integrantes", "inventarios_registrar", "inventarios_editar", "inventarios_eliminar", "inventarios_fisico", "inventarios_historial", "inventarios_exportar", "presupuestos_consultar_mi_area", "cajas_editar_movimientos" };
+            var consultaExtras = new[] { "ventas", "areas", "inventarios", "inventarios_historial", "presupuestos_consultar_mi_area" };;
 
             foreach (var r in roles)
             {

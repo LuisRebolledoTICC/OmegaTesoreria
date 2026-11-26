@@ -9,7 +9,8 @@ import {
   Search,
   AlertCircle,
   Coins,
-  PiggyBank
+  PiggyBank,
+  Pencil
 } from 'lucide-react';
 import { Caja, Operacion } from '../types';
 import { api } from '../services/api';
@@ -42,6 +43,16 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
   const [loadingAreas, setLoadingAreas] = useState(false);
 
   const canAsignarPresupuesto = isAdmin || canAccessModule('presupuestos_asignar') || canAccessModule('presupuestos_administrar');
+
+  // Editar movimiento
+  const canEditarMovimientos = isAdmin || canAccessModule('cajas_editar_movimientos');
+  const [editingMov, setEditingMov] = useState<Operacion | null>(null);
+  const [editImporte, setEditImporte] = useState<number>(0);
+  const [editConcepto, setEditConcepto] = useState('');
+  const [editDescripcion, setEditDescripcion] = useState('');
+  const [editObservaciones, setEditObservaciones] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   // Reversion modal
   const [anulandoOpId, setAnulandoOpId] = useState<number | null>(null);
@@ -181,6 +192,37 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
       loadMovimientos();
     } catch (err: any) {
       alert(err.message || 'Error al anular la operación.');
+    }
+  };
+
+  const handleOpenEdit = (mov: Operacion) => {
+    setEditingMov(mov);
+    setEditImporte(mov.importe);
+    setEditConcepto(mov.concepto);
+    setEditDescripcion(mov.descripcion || '');
+    setEditObservaciones(mov.observaciones || '');
+    setEditError(null);
+  };
+
+  const handleSubmitEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editImporte <= 0) { setEditError('El importe debe ser mayor a cero.'); return; }
+    if (!editConcepto.trim()) { setEditError('El concepto es obligatorio.'); return; }
+    setEditSubmitting(true);
+    try {
+      await api.editarOperacion(editingMov!.id, {
+        importe: Number(editImporte),
+        concepto: editConcepto.trim(),
+        descripcion: editDescripcion.trim() || editConcepto.trim(),
+        observaciones: editObservaciones.trim() || undefined,
+      });
+      setEditingMov(null);
+      await loadMovimientos();
+      onOperationCompleted();
+    } catch (err: any) {
+      setEditError(err.message || 'Error al editar el movimiento.');
+    } finally {
+      setEditSubmitting(false);
     }
   };
 
@@ -433,15 +475,26 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
                   </div>
                 </div>
 
-                {isAdmin && op.estado === 'CONFIRMADA' && op.tipoOperacion !== 'REVERSA' && (
-                  <div className="pt-2 border-t border-slate-100 flex justify-end">
-                    <button
-                      onClick={() => setAnulandoOpId(op.id)}
-                      className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Revertir Movimiento</span>
-                    </button>
+                {(isAdmin || canEditarMovimientos) && op.tipoOperacion !== 'REVERSA' && (
+                  <div className="pt-2 border-t border-slate-100 flex justify-end gap-2">
+                    {canEditarMovimientos && op.estado !== 'ANULADA' && (
+                      <button
+                        onClick={() => handleOpenEdit(op)}
+                        className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        <span>Editar</span>
+                      </button>
+                    )}
+                    {isAdmin && op.estado === 'CONFIRMADA' && (
+                      <button
+                        onClick={() => setAnulandoOpId(op.id)}
+                        className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Revertir</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -462,7 +515,7 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
                 <th className="py-3 px-4 text-right">Importe (MXN)</th>
                 <th className="py-3 px-4">Responsable</th>
                 <th className="py-3 px-4 text-center">Estado</th>
-                {isAdmin && <th className="py-3 px-4 text-center">Acción</th>}
+                {(isAdmin || canEditarMovimientos) && <th className="py-3 px-4 text-center">Acción</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -539,19 +592,30 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
                         {op.estado}
                       </span>
                     </td>
-                    {isAdmin && (
+                    {(isAdmin || canEditarMovimientos) && (
                       <td className="py-3 px-4 text-center whitespace-nowrap">
-                        {op.estado === 'CONFIRMADA' && op.tipoOperacion !== 'REVERSA' ? (
-                          <button
-                            onClick={() => setAnulandoOpId(op.id)}
-                            title="Revertir movimiento contablemente"
-                            className="p-1 text-slate-400 hover:text-red-600 rounded transition"
-                          >
-                            <RotateCcw className="w-4 h-4" />
-                          </button>
-                        ) : (
-                          <span className="text-[11px] text-slate-400">-</span>
-                        )}
+                        <div className="flex items-center justify-center gap-1">
+                          {canEditarMovimientos && op.estado !== 'ANULADA' && op.tipoOperacion !== 'REVERSA' && (
+                            <button
+                              onClick={() => handleOpenEdit(op)}
+                              title="Editar movimiento"
+                              className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          )}
+                          {isAdmin && op.estado === 'CONFIRMADA' && op.tipoOperacion !== 'REVERSA' ? (
+                            <button
+                              onClick={() => setAnulandoOpId(op.id)}
+                              title="Revertir movimiento contablemente"
+                              className="p-1 text-slate-400 hover:text-red-600 rounded transition"
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            !canEditarMovimientos && <span className="text-[11px] text-slate-400">-</span>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -786,6 +850,88 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
                   className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold rounded-lg text-xs transition shadow-xs"
                 >
                   {submitting ? 'Procesando...' : 'Confirmar Movimiento'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Editar Movimiento */}
+      {editingMov && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 max-h-[90dvh] overflow-y-auto">
+            <div className="bg-blue-800 text-white p-5 flex items-center justify-between rounded-t-2xl">
+              <div>
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                  <Pencil className="w-5 h-5" /> Editar Movimiento #{editingMov.id}
+                </h3>
+                <p className="text-xs text-blue-200 mt-0.5">
+                  Tipo: {editingMov.tipoOperacion} · El saldo de la caja se recalculará automáticamente.
+                </p>
+              </div>
+              <button onClick={() => setEditingMov(null)} className="text-white/70 hover:text-white text-lg font-bold p-1">✕</button>
+            </div>
+            <form onSubmit={handleSubmitEdit} className="p-6 space-y-4">
+              {editError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs">
+                  {editError}
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Importe (MXN) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  value={editImporte}
+                  onChange={e => setEditImporte(Number(e.target.value))}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Concepto *</label>
+                <input
+                  type="text"
+                  required
+                  value={editConcepto}
+                  onChange={e => setEditConcepto(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Descripción</label>
+                <input
+                  type="text"
+                  value={editDescripcion}
+                  onChange={e => setEditDescripcion(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Observaciones</label>
+                <input
+                  type="text"
+                  value={editObservaciones}
+                  onChange={e => setEditObservaciones(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div className="flex justify-end space-x-2 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingMov(null)}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSubmitting}
+                  className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-bold shadow-xs transition"
+                >
+                  {editSubmitting ? 'Guardando...' : 'Guardar Cambios'}
                 </button>
               </div>
             </form>

@@ -23,49 +23,90 @@ import {
   ArrowDown,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   X
 } from 'lucide-react';
 import { User, RolPersonalizado } from '../types';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
-const MODULOS_DISPONIBLES = [
-  { id: 'dashboard', nombre: 'Dashboard General', descripcion: 'Panel general con balances y gráficos' },
-  { id: 'ventas', nombre: 'Ventas y Pedidos', descripcion: 'Gestión de jornadas de venta, productos, pedidos y entradas' },
-  { id: 'cajas', nombre: 'Cajas de Tesorería', descripcion: 'Listado, creación y configuración de cajas' },
-  { id: 'conteo', nombre: 'Conteo Físico de Efectivo', descripcion: 'Arqueos y desglose de monedas, billetes y bolsas' },
-  { id: 'operaciones', nombre: 'Movimientos por Caja', descripcion: 'Entradas, salidas y transferencias' },
-  { id: 'reportes', nombre: 'Reportes y Excel', descripcion: 'Auditorías y exportación de archivos Excel' },
-  { id: 'usuarios', nombre: 'Usuarios y Permisos', descripcion: 'Gestión de usuarios y personalización de roles' },
-  { id: 'entradas', nombre: 'Realizar Entradas', descripcion: 'Permiso para realizar y registrar entradas de dinero a cajas y desde Ventas' },
-  // Módulo Áreas
-  { id: 'areas', nombre: 'Áreas: Ver áreas', descripcion: 'Permite acceder al módulo Áreas y consultar su información' },
-  { id: 'areas_crear', nombre: 'Áreas: Crear áreas', descripcion: 'Permite crear nuevas áreas' },
-  { id: 'areas_editar', nombre: 'Áreas: Editar áreas', descripcion: 'Permite modificar nombre y descripción de áreas' },
-  { id: 'areas_desactivar', nombre: 'Áreas: Desactivar áreas', descripcion: 'Permite activar o desactivar áreas conservando su historial' },
-  { id: 'areas_coordinador', nombre: 'Áreas: Asignar coordinadores', descripcion: 'Permite asignar o cambiar el coordinador de un área' },
-  { id: 'areas_integrantes', nombre: 'Áreas: Administrar integrantes del área', descripcion: 'Permite al coordinador agregar y retirar integrantes de su propia área' },
-  // Módulo Inventarios
-  { id: 'inventarios', nombre: 'Inventarios: Ver inventario', descripcion: 'Permite consultar el inventario del área asignada' },
-  { id: 'inventarios_ver_todos', nombre: 'Inventarios: Ver todos los inventarios', descripcion: 'Permite consultar los inventarios de todas las áreas activas aunque no tenga un área asignada' },
-  { id: 'inventarios_registrar', nombre: 'Inventarios: Registrar productos', descripcion: 'Permite dar de alta nuevos productos en el área' },
-  { id: 'inventarios_editar', nombre: 'Inventarios: Editar productos', descripcion: 'Permite modificar nombre, unidad y cantidad de productos' },
-  { id: 'inventarios_eliminar', nombre: 'Inventarios: Eliminar productos', descripcion: 'Permite eliminar productos del inventario actual del área' },
-  { id: 'inventarios_fisico', nombre: 'Inventarios: Realizar inventarios físicos', descripcion: 'Permite cargar inventarios por fecha mediante Excel o captura' },
-  { id: 'inventarios_historial', nombre: 'Inventarios: Consultar historial', descripcion: 'Permite ver inventarios anteriores por fecha' },
-  { id: 'inventarios_exportar', nombre: 'Inventarios: Exportar reportes', descripcion: 'Permite descargar inventarios en Excel y PDF' },
-  // Módulo Presupuestos
-  { id: 'presupuestos', nombre: 'Presupuestos: Ver presupuestos', descripcion: 'Permite acceder al módulo Presupuestos y consultar el presupuesto de su propia área' },
-  { id: 'presupuestos_ver_todos', nombre: 'Presupuestos: Ver todas las áreas', descripcion: 'Permite consultar los presupuestos de todas las áreas activas' },
-  { id: 'presupuestos_egresos_registrar', nombre: 'Presupuestos: Registrar egresos', descripcion: 'Permite registrar gastos desde el saldo disponible del área' },
-  { id: 'presupuestos_egresos_editar', nombre: 'Presupuestos: Editar egresos', descripcion: 'Permite modificar egresos registrados recalculando el saldo' },
-  { id: 'presupuestos_egresos_cancelar', nombre: 'Presupuestos: Cancelar egresos', descripcion: 'Permite cancelar egresos devolviendo el importe al saldo del área' },
-  { id: 'presupuestos_historial', nombre: 'Presupuestos: Consultar historial', descripcion: 'Permite consultar el historial completo de movimientos del presupuesto' },
-  { id: 'presupuestos_asignar', nombre: 'Presupuestos: Asignar desde cajas', descripcion: 'Permite entregar presupuesto a un área desde Movimientos por Caja' },
-  { id: 'presupuestos_devolver', nombre: 'Presupuestos: Devolver dinero a cajas', descripcion: 'Permite registrar devoluciones de presupuesto del área hacia una caja' },
-  { id: 'presupuestos_ajustes', nombre: 'Presupuestos: Realizar ajustes de saldo', descripcion: 'Permite realizar ajustes positivos o negativos de saldo con motivo obligatorio' },
-  { id: 'presupuestos_administrar', nombre: 'Presupuestos: Administrar presupuestos', descripcion: 'Acceso total a todas las operaciones del módulo Presupuestos' },
+// ─── Definición de módulos agrupados por categoría ─────────────────────────
+const GRUPOS_PERMISOS = [
+  {
+    grupo: 'General',
+    color: 'bg-slate-100 text-slate-700 border-slate-300',
+    permisos: [
+      { id: 'dashboard', nombre: 'Dashboard General', descripcion: 'Panel general con balances y gráficos' },
+      { id: 'reportes', nombre: 'Reportes y Excel', descripcion: 'Auditorías y exportación de archivos Excel' },
+      { id: 'usuarios', nombre: 'Usuarios y Permisos', descripcion: 'Gestión de usuarios y personalización de roles' },
+    ],
+  },
+  {
+    grupo: 'Cajas y Movimientos',
+    color: 'bg-amber-50 text-amber-800 border-amber-200',
+    permisos: [
+      { id: 'cajas', nombre: 'Cajas: Ver cajas', descripcion: 'Listado, creación y configuración de cajas' },
+      { id: 'conteo', nombre: 'Cajas: Conteo Físico de Efectivo', descripcion: 'Arqueos y desglose de monedas, billetes y bolsas' },
+      { id: 'operaciones', nombre: 'Cajas: Movimientos por Caja', descripcion: 'Entradas, salidas y transferencias entre cajas' },
+      { id: 'entradas', nombre: 'Cajas: Realizar Entradas', descripcion: 'Permiso para registrar entradas de dinero a cajas' },
+      { id: 'cajas_editar_movimientos', nombre: 'Cajas: Editar movimientos', descripcion: 'Permite editar movimientos existentes y recalcular saldos automáticamente' },
+    ],
+  },
+  {
+    grupo: 'Ventas',
+    color: 'bg-green-50 text-green-800 border-green-200',
+    permisos: [
+      { id: 'ventas', nombre: 'Ventas y Pedidos', descripcion: 'Gestión de jornadas de venta, productos, pedidos y entradas' },
+    ],
+  },
+  {
+    grupo: 'Áreas',
+    color: 'bg-blue-50 text-blue-800 border-blue-200',
+    permisos: [
+      { id: 'areas', nombre: 'Áreas: Ver áreas', descripcion: 'Permite acceder al módulo Áreas y consultar su información' },
+      { id: 'areas_crear', nombre: 'Áreas: Crear áreas', descripcion: 'Permite crear nuevas áreas' },
+      { id: 'areas_editar', nombre: 'Áreas: Editar áreas', descripcion: 'Permite modificar nombre y descripción de áreas' },
+      { id: 'areas_desactivar', nombre: 'Áreas: Desactivar áreas', descripcion: 'Permite activar o desactivar áreas conservando su historial' },
+      { id: 'areas_coordinador', nombre: 'Áreas: Asignar coordinadores', descripcion: 'Permite asignar o cambiar el coordinador de un área' },
+      { id: 'areas_integrantes', nombre: 'Áreas: Administrar integrantes', descripcion: 'Permite al coordinador agregar y retirar integrantes de su área' },
+    ],
+  },
+  {
+    grupo: 'Inventarios',
+    color: 'bg-teal-50 text-teal-800 border-teal-200',
+    permisos: [
+      { id: 'inventarios', nombre: 'Inventarios: Ver inventario', descripcion: 'Permite consultar el inventario del área asignada' },
+      { id: 'inventarios_ver_todos', nombre: 'Inventarios: Ver todos los inventarios', descripcion: 'Permite consultar los inventarios de todas las áreas activas' },
+      { id: 'inventarios_registrar', nombre: 'Inventarios: Registrar productos', descripcion: 'Permite dar de alta nuevos productos en el área' },
+      { id: 'inventarios_editar', nombre: 'Inventarios: Editar productos', descripcion: 'Permite modificar nombre, unidad y cantidad de productos' },
+      { id: 'inventarios_eliminar', nombre: 'Inventarios: Eliminar productos', descripcion: 'Permite eliminar productos del inventario actual del área' },
+      { id: 'inventarios_fisico', nombre: 'Inventarios: Realizar inventarios físicos', descripcion: 'Permite cargar inventarios por fecha mediante Excel o captura' },
+      { id: 'inventarios_historial', nombre: 'Inventarios: Consultar historial', descripcion: 'Permite ver inventarios anteriores por fecha' },
+      { id: 'inventarios_exportar', nombre: 'Inventarios: Exportar reportes', descripcion: 'Permite descargar inventarios en Excel y PDF' },
+    ],
+  },
+  {
+    grupo: 'Presupuestos',
+    color: 'bg-violet-50 text-violet-800 border-violet-200',
+    permisos: [
+      { id: 'presupuestos_consultar_mi_area', nombre: 'Presupuestos: Consultar mi área', descripcion: 'Solo lectura: consulta el saldo y movimientos del área propia. No permite modificar ni ver otras áreas.' },
+      { id: 'presupuestos_consultar_todos', nombre: 'Presupuestos: Consultar todas las áreas', descripcion: 'Solo lectura: consulta los saldos de TODAS las áreas. No permite asignar, editar ni modificar presupuestos.' },
+      { id: 'presupuestos', nombre: 'Presupuestos: Ver presupuestos', descripcion: 'Acceso al módulo Presupuestos y consulta del área propia (permiso operativo)' },
+      { id: 'presupuestos_ver_todos', nombre: 'Presupuestos: Ver todas las áreas', descripcion: 'Permite consultar los presupuestos de todas las áreas activas (permiso operativo)' },
+      { id: 'presupuestos_egresos_registrar', nombre: 'Presupuestos: Registrar egresos', descripcion: 'Permite registrar gastos desde el saldo disponible del área' },
+      { id: 'presupuestos_egresos_editar', nombre: 'Presupuestos: Editar egresos', descripcion: 'Permite modificar egresos registrados recalculando el saldo' },
+      { id: 'presupuestos_egresos_cancelar', nombre: 'Presupuestos: Cancelar egresos', descripcion: 'Permite cancelar egresos devolviendo el importe al saldo del área' },
+      { id: 'presupuestos_historial', nombre: 'Presupuestos: Consultar historial', descripcion: 'Permite consultar el historial completo de movimientos del presupuesto' },
+      { id: 'presupuestos_asignar', nombre: 'Presupuestos: Asignar desde cajas', descripcion: 'Permite entregar presupuesto a un área desde Movimientos por Caja' },
+      { id: 'presupuestos_devolver', nombre: 'Presupuestos: Devolver dinero a cajas', descripcion: 'Permite registrar devoluciones de presupuesto del área hacia una caja' },
+      { id: 'presupuestos_ajustes', nombre: 'Presupuestos: Realizar ajustes de saldo', descripcion: 'Permite realizar ajustes positivos o negativos de saldo con motivo obligatorio' },
+      { id: 'presupuestos_administrar', nombre: 'Presupuestos: Administrar presupuestos', descripcion: 'Acceso total a todas las operaciones del módulo Presupuestos' },
+    ],
+  },
 ];
+
+// Lista plana de todos los módulos para mantener compatibilidad con el código existente
+const MODULOS_DISPONIBLES = GRUPOS_PERMISOS.flatMap(g => g.permisos);
 
 export const UsuariosView: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -126,6 +167,10 @@ export const UsuariosView: React.FC = () => {
   const [rolModulos, setRolModulos] = useState<string[]>(['dashboard', 'cajas']);
   const [rolError, setRolError] = useState<string | null>(null);
   const [savingRol, setSavingRol] = useState(false);
+  // Estado acordeón de grupos en modal de rol
+  const [expandedGrupos, setExpandedGrupos] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(GRUPOS_PERMISOS.map(g => [g.grupo, true]))
+  );
 
   const loadData = async () => {
     try {
@@ -436,6 +481,21 @@ export const UsuariosView: React.FC = () => {
       setRolModulos(rolModulos.filter(m => m !== modId));
     } else {
       setRolModulos([...rolModulos, modId]);
+    }
+  };
+
+  const toggleGrupoExpand = (grupoNombre: string) => {
+    setExpandedGrupos(prev => ({ ...prev, [grupoNombre]: !prev[grupoNombre] }));
+  };
+
+  const handleSelectAllGrupo = (grupoIds: string[], disabled: boolean) => {
+    if (disabled) return;
+    const allChecked = grupoIds.every(id => rolModulos.includes(id));
+    if (allChecked) {
+      setRolModulos(rolModulos.filter(id => !grupoIds.includes(id)));
+    } else {
+      const toAdd = grupoIds.filter(id => !rolModulos.includes(id));
+      setRolModulos([...rolModulos, ...toAdd]);
     }
   };
 
@@ -1073,21 +1133,24 @@ export const UsuariosView: React.FC = () => {
                     <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-2">
                       Módulos Visibles:
                     </label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {MODULOS_DISPONIBLES.map((m) => {
-                        const tieneAcceso = r.nombre === 'Administrador' || r.modulosPermitidos.includes(m.id);
+                    <div className="space-y-2">
+                      {GRUPOS_PERMISOS.map((g) => {
+                        const permisosActivos = r.nombre === 'Administrador'
+                          ? g.permisos
+                          : g.permisos.filter(m => r.modulosPermitidos.includes(m.id));
+                        if (permisosActivos.length === 0) return null;
                         return (
-                          <span
-                            key={m.id}
-                            className={`inline-flex items-center px-2 py-1 rounded-md text-[10px] font-medium border ${
-                              tieneAcceso
-                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                : 'bg-slate-50 text-slate-400 border-slate-200 line-through opacity-60'
-                            }`}
-                          >
-                            {tieneAcceso && <Check className="w-3 h-3 mr-1 text-emerald-600" />}
-                            {m.nombre}
-                          </span>
+                          <div key={g.grupo}>
+                            <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 px-1 ${g.color} rounded`}>{g.grupo}</p>
+                            <div className="flex flex-wrap gap-1">
+                              {permisosActivos.map(m => (
+                                <span key={m.id} className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium border bg-emerald-50 text-emerald-800 border-emerald-200">
+                                  <Check className="w-3 h-3 mr-1 text-emerald-600" />
+                                  {m.nombre}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
                         );
                       })}
                     </div>
@@ -1501,31 +1564,69 @@ export const UsuariosView: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-2">
                   Módulos y Secciones Permitidas:
                 </label>
-                <div className="space-y-2 max-h-56 overflow-y-auto p-1">
-                  {MODULOS_DISPONIBLES.map((m) => {
-                    const checked = rolNombre === 'Administrador' || rolModulos.includes(m.id);
+                <div className="space-y-3 max-h-96 overflow-y-auto p-1">
+                  {GRUPOS_PERMISOS.map((grupo) => {
+                    const grupoIds = grupo.permisos.map(p => p.id);
                     const disabled = rolNombre === 'Administrador';
+                    const allChecked = disabled || grupoIds.every(id => rolModulos.includes(id));
+                    const someChecked = !disabled && grupoIds.some(id => rolModulos.includes(id));
+                    const expanded = expandedGrupos[grupo.grupo] !== false;
                     return (
-                      <div
-                        key={m.id}
-                        onClick={() => !disabled && handleToggleModulo(m.id)}
-                        className={`flex items-start space-x-3 p-3 rounded-xl border transition cursor-pointer ${
-                          checked
-                            ? 'bg-amber-50/70 border-amber-300'
-                            : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-                        } ${disabled ? 'cursor-not-allowed opacity-80' : ''}`}
-                      >
-                        <div className="mt-0.5">
-                          {checked ? (
-                            <CheckSquare className="w-4 h-4 text-amber-600" />
-                          ) : (
-                            <Square className="w-4 h-4 text-slate-400" />
-                          )}
+                      <div key={grupo.grupo} className={`border rounded-xl overflow-hidden ${grupo.color}`}>
+                        {/* Cabecera del grupo */}
+                        <div
+                          className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
+                          onClick={() => toggleGrupoExpand(grupo.grupo)}
+                        >
+                          <span className="text-xs font-bold flex items-center gap-2">
+                            {grupo.grupo}
+                            {someChecked && !allChecked && (
+                              <span className="text-[10px] font-normal opacity-70">(parcial)</span>
+                            )}
+                          </span>
+                          <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              disabled={disabled}
+                              onClick={() => handleSelectAllGrupo(grupoIds, disabled)}
+                              className="text-[11px] underline opacity-70 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40 transition"
+                            >
+                              {allChecked ? 'Quitar todos' : 'Seleccionar todos'}
+                            </button>
+                            <ChevronDown className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-800">{m.nombre}</p>
-                          <p className="text-[11px] text-slate-500">{m.descripcion}</p>
-                        </div>
+                        {/* Lista de permisos expandible */}
+                        {expanded && (
+                          <div className="bg-white/70 p-2 space-y-1">
+                            {grupo.permisos.map(m => {
+                              const checked = disabled || rolModulos.includes(m.id);
+                              return (
+                                <div
+                                  key={m.id}
+                                  onClick={() => !disabled && handleToggleModulo(m.id)}
+                                  className={`flex items-start space-x-3 p-2 rounded-lg border transition cursor-pointer ${
+                                    checked
+                                      ? 'bg-amber-50/70 border-amber-300'
+                                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                                  } ${disabled ? 'cursor-not-allowed opacity-80' : ''}`}
+                                >
+                                  <div className="mt-0.5 shrink-0">
+                                    {checked ? (
+                                      <CheckSquare className="w-4 h-4 text-amber-600" />
+                                    ) : (
+                                      <Square className="w-4 h-4 text-slate-400" />
+                                    )}
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-bold text-slate-800">{m.nombre}</p>
+                                    <p className="text-[11px] text-slate-500">{m.descripcion}</p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     );
                   })}

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using OmegaTesoreria.Api.Constants;
 using OmegaTesoreria.Api.DTOs;
 using OmegaTesoreria.Api.Services;
 
@@ -149,6 +150,36 @@ public class OperacionesController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // PUT: api/operaciones/{id} - Editar movimiento (requiere permiso cajas_editar_movimientos)
+    [HttpPut("{id}")]
+    public async Task<IActionResult> EditarMovimiento(int id, [FromBody] EditarOperacionRequest request)
+    {
+        try
+        {
+            var userName = User.Identity?.Name ?? "";
+            var isAdmin = User.IsInRole("Administrador");
+
+            if (!isAdmin && !await _authService.HasPermissionAsync(userName, Permissions.CajasEditarMovimientos))
+                return StatusCode(403, new { message = "No tienes permiso para editar movimientos de caja. Requieres el permiso 'Editar movimientos de caja'." });
+
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "1");
+            var op = await _tesoreriaService.EditarOperacionAsync(id, request, userId, userName);
+            return Ok(op);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
         }
     }
 }

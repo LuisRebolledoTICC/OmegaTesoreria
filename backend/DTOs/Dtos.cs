@@ -164,3 +164,13 @@ public class CreateTipoBolsaRequest
     public int? DenominacionAsociadaId { get; set; }
     public int? CajaId { get; set; }
 }
+
+// DTO para editar un movimiento de caja existente
+public class EditarOperacionRequest
+{
+    public decimal Importe { get; set; }
+    public string Concepto { get; set; } = string.Empty;
+    public string? Descripcion { get; set; }
+    public string? Observaciones { get; set; }
+    public DateTime? FechaOperacion { get; set; }
+}

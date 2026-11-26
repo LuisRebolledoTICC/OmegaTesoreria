@@ -55,7 +55,14 @@ const CARD_THEMES = [
 export const PresupuestosView: React.FC<PresupuestosViewProps> = ({ cajas, onBalanceChanged }) => {
   const { isAdmin, canAccessModule } = useAuth();
 
-  const canVerTodos = isAdmin || canAccessModule('presupuestos_ver_todos') || canAccessModule('presupuestos_administrar');
+  const canVerTodos = isAdmin || canAccessModule('presupuestos_ver_todos') || canAccessModule('presupuestos_administrar') || canAccessModule('presupuestos_consultar_todos');
+  const canSoloConsulta = !isAdmin &&
+    (canAccessModule('presupuestos_consultar_mi_area') || canAccessModule('presupuestos_consultar_todos')) &&
+    !canAccessModule('presupuestos') &&
+    !canAccessModule('presupuestos_ver_todos') &&
+    !canAccessModule('presupuestos_asignar') &&
+    !canAccessModule('presupuestos_egresos_registrar') &&
+    !canAccessModule('presupuestos_administrar');
   const canRegistrarEgreso = isAdmin || canAccessModule('presupuestos_egresos_registrar') || canAccessModule('presupuestos_administrar');
   const canEditarEgreso = isAdmin || canAccessModule('presupuestos_egresos_editar') || canAccessModule('presupuestos_administrar');
   const canCancelarEgreso = isAdmin || canAccessModule('presupuestos_egresos_cancelar') || canAccessModule('presupuestos_administrar');
@@ -437,6 +444,13 @@ export const PresupuestosView: React.FC<PresupuestosViewProps> = ({ cajas, onBal
 
       {selectedAreaId === null ? (
         <>
+          {/* Banner solo lectura */}
+          {canSoloConsulta && (
+            <div className="flex items-center gap-3 px-4 py-2.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl text-xs font-medium">
+              <span>👁️</span>
+              <span>Tienes acceso de <strong>solo consulta</strong> a los presupuestos. No puedes registrar egresos, asignar dinero ni realizar ajustes.</span>
+            </div>
+          )}
           {/* Header Principal */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
             <div>

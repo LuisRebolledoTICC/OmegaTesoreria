@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OmegaTesoreria.Api.Constants;
+using OmegaTesoreria.Api.DTOs;
 using OmegaTesoreria.Api.Services;
 
 namespace OmegaTesoreria.Api.Controllers;
@@ -36,11 +37,34 @@ public class PresupuestosController : ControllerBase
         return false;
     }
 
+    // Verifica si el usuario SOLO tiene permiso de consulta (sin operaciones de escritura)
+    private async Task<bool> HasOnlyReadPermissionAsync()
+    {
+        if (IsAdmin()) return false; // admin siempre puede escribir
+        var userName = GetUserName();
+        bool tieneConsultarTodos = await _authService.HasPermissionAsync(userName, Permissions.PresupuestosConsultarTodos);
+        bool tieneConsultarMiArea = await _authService.HasPermissionAsync(userName, Permissions.PresupuestosConsultarMiArea);
+        bool tieneOtrosPermisos = await _authService.HasPermissionAsync(userName, "presupuestos") ||
+                                  await _authService.HasPermissionAsync(userName, "presupuestos_ver_todos") ||
+                                  await _authService.HasPermissionAsync(userName, "presupuestos_asignar") ||
+                                  await _authService.HasPermissionAsync(userName, "presupuestos_devolver") ||
+                                  await _authService.HasPermissionAsync(userName, "presupuestos_egresos_registrar") ||
+                                  await _authService.HasPermissionAsync(userName, "presupuestos_egresos_editar") ||
+                                  await _authService.HasPermissionAsync(userName, "presupuestos_egresos_cancelar") ||
+                                  await _authService.HasPermissionAsync(userName, "presupuestos_ajustes") ||
+                                  await _authService.HasPermissionAsync(userName, "presupuestos_administrar");
+        return (tieneConsultarTodos || tieneConsultarMiArea) && !tieneOtrosPermisos;
+    }
+
     // GET: api/presupuestos
+    // Accesible con: consultar_mi_area, consultar_todos, presupuestos, presupuestos_ver_todos, presupuestos_administrar
     [HttpGet]
     public async Task<IActionResult> GetResumen()
     {
-        if (!await HasAnyPermissionAsync(Permissions.PresupuestosConsultarMiArea, Permissions.PresupuestosAdministrar))
+        if (!await HasAnyPermissionAsync(
+            Permissions.PresupuestosConsultarMiArea,
+            Permissions.PresupuestosConsultarTodos,
+            "presupuestos", "presupuestos_ver_todos", "presupuestos_administrar"))
             return Forbid();
 
         var data = await _presupuestosService.GetResumenAreasAsync(GetUserId(), GetUserName(), IsAdmin());
@@ -48,10 +72,12 @@ public class PresupuestosController : ControllerBase
     }
 
     // GET: api/presupuestos/areas-activas
+    // Solo para operaciones de escritura (asignar, devolver, ajustes) — no para solo-consulta
     [HttpGet("areas-activas")]
     public async Task<IActionResult> GetAreasActivas([FromServices] OmegaTesoreria.Api.Data.AppDbContext db)
     {
-        if (!await HasAnyPermissionAsync("presupuestos", "presupuestos_ver_todos", "presupuestos_asignar", "presupuestos_devolver", "presupuestos_ajustes", "presupuestos_administrar"))
+        if (!await HasAnyPermissionAsync("presupuestos", "presupuestos_ver_todos",
+            "presupuestos_asignar", "presupuestos_devolver", "presupuestos_ajustes", "presupuestos_administrar"))
             return Forbid();
 
         var areas = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
@@ -64,10 +90,14 @@ public class PresupuestosController : ControllerBase
     }
 
     // GET: api/presupuestos/area/{areaId}
+    // Accesible con permisos de consulta (mi area verifica que sea su área) y operativos
     [HttpGet("area/{areaId}")]
     public async Task<IActionResult> GetDetalleArea(int areaId)
     {
-        if (!await HasAnyPermissionAsync("presupuestos", "presupuestos_ver_todos", "presupuestos_historial", "presupuestos_administrar"))
+        if (!await HasAnyPermissionAsync(
+            Permissions.PresupuestosConsultarMiArea,
+            Permissions.PresupuestosConsultarTodos,
+            "presupuestos", "presupuestos_ver_todos", "presupuestos_historial", "presupuestos_administrar"))
             return Forbid();
 
         try
@@ -85,10 +115,13 @@ public class PresupuestosController : ControllerBase
         }
     }
 
-    // POST: api/presupuestos/asignar
+    // POST: api/presupuestos/asignar — BLOQUEADO para usuarios solo-consulta
     [HttpPost("asignar")]
     public async Task<IActionResult> Asignar([FromBody] AsignarPresupuestoRequest request)
     {
+        if (await HasOnlyReadPermissionAsync())
+            return StatusCode(403, new { message = "Tu permiso es de solo consulta. No puedes asignar presupuesto." });
+
         if (!await HasAnyPermissionAsync("presupuestos_asignar", "presupuestos_administrar"))
             return Forbid();
 
@@ -103,10 +136,13 @@ public class PresupuestosController : ControllerBase
         }
     }
 
-    // POST: api/presupuestos/egresos
+    // POST: api/presupuestos/egresos — BLOQUEADO para usuarios solo-consulta
     [HttpPost("egresos")]
     public async Task<IActionResult> RegistrarEgreso([FromBody] RegistrarEgresoPresupuestoRequest request)
     {
+        if (await HasOnlyReadPermissionAsync())
+            return StatusCode(403, new { message = "Tu permiso es de solo consulta. No puedes registrar egresos." });
+
         if (!await HasAnyPermissionAsync("presupuestos_egresos_registrar", "presupuestos_administrar"))
             return Forbid();
 
@@ -125,10 +161,13 @@ public class PresupuestosController : ControllerBase
         }
     }
 
-    // PUT: api/presupuestos/egresos/{id}
+    // PUT: api/presupuestos/egresos/{id} — BLOQUEADO para usuarios solo-consulta
     [HttpPut("egresos/{id}")]
     public async Task<IActionResult> EditarEgreso(int id, [FromBody] EditarEgresoPresupuestoRequest request)
     {
+        if (await HasOnlyReadPermissionAsync())
+            return StatusCode(403, new { message = "Tu permiso es de solo consulta. No puedes editar egresos." });
+
         if (!await HasAnyPermissionAsync("presupuestos_egresos_editar", "presupuestos_administrar"))
             return Forbid();
 
@@ -151,10 +190,13 @@ public class PresupuestosController : ControllerBase
         }
     }
 
-    // POST: api/presupuestos/egresos/{id}/cancelar
+    // POST: api/presupuestos/egresos/{id}/cancelar — BLOQUEADO para usuarios solo-consulta
     [HttpPost("egresos/{id}/cancelar")]
     public async Task<IActionResult> CancelarEgreso(int id, [FromBody] CancelarEgresoPresupuestoRequest? request)
     {
+        if (await HasOnlyReadPermissionAsync())
+            return StatusCode(403, new { message = "Tu permiso es de solo consulta. No puedes cancelar egresos." });
+
         if (!await HasAnyPermissionAsync("presupuestos_egresos_cancelar", "presupuestos_administrar"))
             return Forbid();
 
@@ -183,10 +225,13 @@ public class PresupuestosController : ControllerBase
         }
     }
 
-    // POST: api/presupuestos/devolver
+    // POST: api/presupuestos/devolver — BLOQUEADO para usuarios solo-consulta
     [HttpPost("devolver")]
     public async Task<IActionResult> Devolver([FromBody] DevolverPresupuestoRequest request)
     {
+        if (await HasOnlyReadPermissionAsync())
+            return StatusCode(403, new { message = "Tu permiso es de solo consulta. No puedes registrar devoluciones." });
+
         if (!await HasAnyPermissionAsync("presupuestos_devolver", "presupuestos_administrar"))
             return Forbid();
 
@@ -201,10 +246,13 @@ public class PresupuestosController : ControllerBase
         }
     }
 
-    // POST: api/presupuestos/ajustes
+    // POST: api/presupuestos/ajustes — BLOQUEADO para usuarios solo-consulta
     [HttpPost("ajustes")]
     public async Task<IActionResult> RegistrarAjuste([FromBody] AjustePresupuestoRequest request)
     {
+        if (await HasOnlyReadPermissionAsync())
+            return StatusCode(403, new { message = "Tu permiso es de solo consulta. No puedes registrar ajustes." });
+
         if (!await HasAnyPermissionAsync("presupuestos_ajustes", "presupuestos_administrar"))
             return Forbid();
 

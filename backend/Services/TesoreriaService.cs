@@ -29,6 +29,7 @@ public interface ITesoreriaService
     Task<OperacionDto> RegistrarSalidaAsync(SalidaRequest request, int userId, string userName);
     Task<OperacionDto> RegistrarTransferenciaAsync(TransferenciaRequest request, int userId, string userName);
     Task<OperacionDto> AnularOperacionAsync(int operacionId, string motivo, int userId, string userName);
+    Task<OperacionDto> EditarOperacionAsync(int operacionId, EditarOperacionRequest request, int userId, string userName);
 
     Task<List<OperacionDto>> GetHistorialOperacionesAsync(
         DateTime? fechaInicio,
@@ -880,6 +881,93 @@ public class TesoreriaService : ITesoreriaService
             .OrderByDescending(a => a.FechaHora)
             .Take(100)
             .ToListAsync();
+    }
+
+    public async Task<OperacionDto> EditarOperacionAsync(int operacionId, EditarOperacionRequest request, int userId, string userName)
+    {
+        if (request.Importe <= 0)
+            throw new InvalidOperationException("El importe debe ser mayor a cero.");
+
+        using var tx = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var op = await _context.Operaciones
+                .FirstOrDefaultAsync(o => o.Id == operacionId)
+                ?? throw new KeyNotFoundException($"Movimiento #{operacionId} no encontrado.");
+
+            if (op.Estado == "ANULADA")
+                throw new InvalidOperationException("No se puede editar un movimiento anulado.");
+
+            var importeAnterior = op.Importe;
+            var conceptoAnterior = op.Concepto;
+            decimal delta = request.Importe - importeAnterior;
+
+            op.Importe = request.Importe;
+            op.Concepto = request.Concepto.Trim();
+            op.Descripcion = (request.Descripcion ?? request.Concepto).Trim();
+            op.Observaciones = request.Observaciones;
+            if (request.FechaOperacion.HasValue)
+                op.FechaOperacion = request.FechaOperacion.Value;
+
+            if (delta != 0)
+            {
+                if (op.TipoOperacion == "ENTRADA" && op.CajaDestinoId.HasValue)
+                {
+                    var caja = await _context.Cajas.FindAsync(op.CajaDestinoId.Value)
+                        ?? throw new InvalidOperationException("Caja destino no encontrada.");
+                    caja.SaldoActual += delta;
+                }
+                else if (op.TipoOperacion == "SALIDA" && op.CajaOrigenId.HasValue)
+                {
+                    var caja = await _context.Cajas.FindAsync(op.CajaOrigenId.Value)
+                        ?? throw new InvalidOperationException("Caja origen no encontrada.");
+                    if (caja.SaldoActual - delta < 0)
+                        throw new InvalidOperationException($"El nuevo importe dejaría saldo negativo en '{caja.Nombre}'.");
+                    caja.SaldoActual -= delta;
+                }
+                else if (op.TipoOperacion == "TRANSFERENCIA")
+                {
+                    if (op.CajaOrigenId.HasValue)
+                    {
+                        var origen = await _context.Cajas.FindAsync(op.CajaOrigenId.Value)
+                            ?? throw new InvalidOperationException("Caja origen no encontrada.");
+                        if (origen.SaldoActual - delta < 0)
+                            throw new InvalidOperationException($"El nuevo importe dejaría saldo negativo en '{origen.Nombre}'.");
+                        origen.SaldoActual -= delta;
+                    }
+                    if (op.CajaDestinoId.HasValue)
+                    {
+                        var destino = await _context.Cajas.FindAsync(op.CajaDestinoId.Value)
+                            ?? throw new InvalidOperationException("Caja destino no encontrada.");
+                        destino.SaldoActual += delta;
+                    }
+                }
+            }
+
+            _context.Auditoria.Add(new Auditoria
+            {
+                UsuarioId = userId,
+                UsuarioNombre = userName,
+                Accion = "EDITAR_MOVIMIENTO",
+                Entidad = "Operacion",
+                EntidadId = op.Id.ToString(),
+                FechaHora = DateTime.UtcNow,
+                Descripcion = $"Edición de movimiento #{op.Id} ({op.TipoOperacion}). " +
+                              $"Concepto: '{conceptoAnterior}' → '{op.Concepto}'. " +
+                              $"Importe: ${importeAnterior:N2} → ${request.Importe:N2} MXN. " +
+                              $"Editado por: {userName}"
+            });
+
+            await _context.SaveChangesAsync();
+            await tx.CommitAsync();
+
+            return (await GetOperacionByIdAsync(op.Id))!;
+        }
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
     }
 
     // Helper methods

@@ -37,7 +37,7 @@ const MainLayout: React.FC = () => {
     tab === 'inventarios'
       ? canAccessModule('inventarios') || canAccessModule('inventarios_ver_todos')
       : tab === 'presupuestos'
-      ? canAccessModule('presupuestos') || canAccessModule('presupuestos_ver_todos') || canAccessModule('presupuestos_administrar')
+      ? canAccessModule('presupuestos') || canAccessModule('presupuestos_ver_todos') || canAccessModule('presupuestos_administrar') || canAccessModule('presupuestos_consultar_mi_area') || canAccessModule('presupuestos_consultar_todos')
       : canAccessModule(tab);
   const availableTabs = ORDERED_TABS.filter((t) => canAccessTab(t));
   const firstAvailableTab = availableTabs[0] || null;

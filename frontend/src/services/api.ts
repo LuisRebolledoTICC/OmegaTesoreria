@@ -348,6 +348,21 @@ export const api = {
     return handleResponse<Operacion>(res);
   },
 
+  async editarOperacion(id: number, data: {
+    importe: number;
+    concepto: string;
+    descripcion?: string;
+    observaciones?: string;
+    fechaOperacion?: string;
+  }): Promise<Operacion> {
+    const res = await fetch(`${API_BASE_URL}/operaciones/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<Operacion>(res);
+  },
+
   // Respaldos
   async getRespaldos(): Promise<RespaldoInfo[]> {
     const res = await fetch(`${API_BASE_URL}/respaldos`, { headers: getHeaders() });

@@ -475,6 +475,8 @@ export interface AsignacionDeuda {
   usuarioId: number;
   usuarioNombre: string;
   estado: 'PENDIENTE' | 'PAGADO' | 'NO_ASISTIO';
+  totalAbonado: number;
+  saldoPendiente: number;
   deudaCorrespondiente: number;
   formaPago?: 'EFECTIVO' | 'TRANSFERENCIA' | null;
   cajaId?: number | null;
@@ -483,6 +485,7 @@ export interface AsignacionDeuda {
   fechaPago?: string | null;
   registradoPagoPor?: string | null;
   fechaAsignacion: string;
+  abonos?: HistorialPagoDeuda[];
 }
 
 export interface UsuarioDeudaDetalle {

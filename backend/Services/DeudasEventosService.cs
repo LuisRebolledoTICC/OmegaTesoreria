@@ -84,6 +84,7 @@ public class DeudasEventosService : IDeudasEventosService
     {
         var actividades = await _context.ActividadesDeuda
             .Include(a => a.Asignaciones)
+                .ThenInclude(asig => asig.HistorialPagos)
             .OrderByDescending(a => a.FechaActividad)
             .ThenByDescending(a => a.Id)
             .ToListAsync();
@@ -98,6 +99,21 @@ public class DeudasEventosService : IDeudasEventosService
         var pagados = activas.Count(x => x.Estado == "PAGADO");
         var noAsistio = activas.Count(x => x.Estado == "NO_ASISTIO");
 
+        decimal recaudado = activas
+            .SelectMany(x => x.HistorialPagos ?? Enumerable.Empty<HistorialPagoDeuda>())
+            .Where(h => h.Estado == "CONFIRMADO")
+            .Sum(h => h.Importe);
+
+        decimal pendiente = activas
+            .Where(x => x.Estado != "NO_ASISTIO")
+            .Sum(x =>
+            {
+                var abonado = (x.HistorialPagos ?? Enumerable.Empty<HistorialPagoDeuda>())
+                    .Where(h => h.Estado == "CONFIRMADO")
+                    .Sum(h => h.Importe);
+                return Math.Max(0m, a.Importe - abonado);
+            });
+
         return new ActividadDeudaDto(
             a.Id,
             a.Nombre,
@@ -111,8 +127,8 @@ public class DeudasEventosService : IDeudasEventosService
             pendientes,
             pagados,
             noAsistio,
-            pagados * a.Importe,
-            pendientes * a.Importe
+            recaudado,
+            pendiente
         );
     }
 
@@ -293,6 +309,7 @@ public class DeudasEventosService : IDeudasEventosService
 
         var asignaciones = await _context.AsignacionesActividadDeuda
             .Include(a => a.ActividadDeuda)
+            .Include(a => a.HistorialPagos)
             .Where(a => a.ActividadDeuda != null && a.ActividadDeuda.Activa)
             .ToListAsync();
 
@@ -332,6 +349,7 @@ public class DeudasEventosService : IDeudasEventosService
         var asignaciones = await _context.AsignacionesActividadDeuda
             .Include(a => a.ActividadDeuda)
             .Include(a => a.Caja)
+            .Include(a => a.HistorialPagos)
             .Where(a => a.UsuarioId == usuarioId && a.ActividadDeuda != null && a.ActividadDeuda.Activa)
             .OrderByDescending(a => a.ActividadDeuda!.FechaActividad)
             .ThenByDescending(a => a.Id)
@@ -347,19 +365,44 @@ public class DeudasEventosService : IDeudasEventosService
 
     private static UsuarioDeudaResumenDto BuildUsuarioResumen(User u, List<AsignacionActividadDeuda> list)
     {
-        decimal deuda = list.Where(x => x.Estado == "PENDIENTE").Sum(x => x.ActividadDeuda?.Importe ?? 0m);
-        decimal pagado = list.Where(x => x.Estado == "PAGADO").Sum(x => x.ActividadDeuda?.Importe ?? 0m);
-        int pend = list.Count(x => x.Estado == "PENDIENTE");
-        int pag = list.Count(x => x.Estado == "PAGADO");
-        int noAsist = list.Count(x => x.Estado == "NO_ASISTIO");
+        decimal deudaTotal = 0m;
+        decimal totalPagado = 0m;
+        int pend = 0;
+        int pag = 0;
+        int noAsist = 0;
+
+        foreach (var a in list)
+        {
+            var importeOriginal = a.ActividadDeuda?.Importe ?? 0m;
+            var abonosValidos = (a.HistorialPagos ?? Enumerable.Empty<HistorialPagoDeuda>())
+                .Where(h => h.Estado == "CONFIRMADO")
+                .Sum(h => h.Importe);
+
+            totalPagado += abonosValidos;
+
+            if (a.Estado == "NO_ASISTIO")
+            {
+                noAsist++;
+            }
+            else if (a.Estado == "PAGADO")
+            {
+                pag++;
+            }
+            else
+            {
+                pend++;
+                var saldo = Math.Max(0m, importeOriginal - abonosValidos);
+                deudaTotal += saldo;
+            }
+        }
 
         return new UsuarioDeudaResumenDto(
             u.Id,
             u.UserName,
             u.Nombre,
             u.Rol,
-            deuda,
-            pagado,
+            deudaTotal,
+            totalPagado,
             pend,
             pag,
             noAsist,
@@ -370,7 +413,47 @@ public class DeudasEventosService : IDeudasEventosService
     private static AsignacionDeudaDto MapAsignacionDto(AsignacionActividadDeuda a, string usuarioNombre)
     {
         decimal importeOriginal = a.ActividadDeuda?.Importe ?? 0m;
-        decimal deuda = a.Estado == "PENDIENTE" ? importeOriginal : 0m;
+        var abonosConfirmados = (a.HistorialPagos ?? Enumerable.Empty<HistorialPagoDeuda>())
+            .Where(h => h.Estado == "CONFIRMADO")
+            .ToList();
+
+        decimal totalAbonado = abonosConfirmados.Sum(h => h.Importe);
+        decimal saldoPendiente = a.Estado == "NO_ASISTIO" ? 0m : Math.Max(0m, importeOriginal - totalAbonado);
+        decimal deuda = a.Estado == "PENDIENTE" ? saldoPendiente : 0m;
+
+        var abonosDtos = (a.HistorialPagos ?? Enumerable.Empty<HistorialPagoDeuda>())
+            .OrderByDescending(h => h.FechaPago)
+            .ThenByDescending(h => h.Id)
+            .Select(h => new HistorialPagoDeudaDto(
+                h.Id,
+                h.AsignacionActividadDeudaId,
+                h.ActividadDeudaId,
+                a.ActividadDeuda?.Nombre ?? "Actividad",
+                h.UsuarioId,
+                usuarioNombre,
+                h.Importe,
+                h.FormaPago,
+                h.CajaId,
+                h.CajaNombre,
+                h.OperacionTesoreriaId,
+                h.OperacionReversaId,
+                h.Estado,
+                h.FechaPago,
+                h.RegistradoPor,
+                h.FechaReversion,
+                h.RevertidoPor,
+                h.MotivoReversion
+            ))
+            .ToList();
+
+        // Si hay un abono confirmado más reciente, usar su forma de pago y caja
+        var ultimoAbono = abonosConfirmados.OrderByDescending(h => h.FechaPago).ThenByDescending(h => h.Id).FirstOrDefault();
+        var formaPago = a.FormaPago ?? ultimoAbono?.FormaPago;
+        var cajaId = a.CajaId ?? ultimoAbono?.CajaId;
+        var cajaNombre = a.Caja?.Nombre ?? ultimoAbono?.CajaNombre;
+        var operacionId = a.OperacionTesoreriaId ?? ultimoAbono?.OperacionTesoreriaId;
+        var fechaPago = a.FechaPago ?? ultimoAbono?.FechaPago;
+        var registradoPor = a.RegistradoPagoPor ?? ultimoAbono?.RegistradoPor;
 
         return new AsignacionDeudaDto(
             a.Id,
@@ -382,14 +465,17 @@ public class DeudasEventosService : IDeudasEventosService
             a.UsuarioId,
             usuarioNombre,
             a.Estado,
+            totalAbonado,
+            saldoPendiente,
             deuda,
-            a.FormaPago,
-            a.CajaId,
-            a.Caja?.Nombre,
-            a.OperacionTesoreriaId,
-            a.FechaPago,
-            a.RegistradoPagoPor,
-            a.FechaAsignacion
+            formaPago,
+            cajaId,
+            cajaNombre,
+            operacionId,
+            fechaPago,
+            registradoPor,
+            a.FechaAsignacion,
+            abonosDtos
         );
     }
 
@@ -411,6 +497,7 @@ public class DeudasEventosService : IDeudasEventosService
         {
             var asignacion = await _context.AsignacionesActividadDeuda
                 .Include(a => a.ActividadDeuda)
+                .Include(a => a.HistorialPagos)
                 .Include(a => a.Usuario!)
                     .ThenInclude(u => u.UsuarioRoles)
                         .ThenInclude(ur => ur.RolPersonalizado)
@@ -420,8 +507,30 @@ public class DeudasEventosService : IDeudasEventosService
             if (asignacion.Usuario != null && IsUserAdmin(asignacion.Usuario) && !isAdmin)
                 throw new InvalidOperationException("No tienes permiso para modificar deudas de usuarios administradores.");
 
-            if (asignacion.Estado == "PAGADO")
-                throw new InvalidOperationException("Esta actividad ya se encuentra pagada. Para modificarla primero debes revertir el pago.");
+            if (asignacion.Estado == "NO_ASISTIO")
+                throw new InvalidOperationException("No se pueden registrar abonos a una actividad marcada como 'No asistió'. Cámbiala a Pendiente primero.");
+
+            decimal importeOriginal = asignacion.ActividadDeuda?.Importe ?? 0m;
+            if (importeOriginal <= 0)
+                throw new InvalidOperationException("El importe original de la actividad debe ser mayor a cero.");
+
+            decimal abonadoPrevio = (asignacion.HistorialPagos ?? Enumerable.Empty<HistorialPagoDeuda>())
+                .Where(h => h.Estado == "CONFIRMADO")
+                .Sum(h => h.Importe);
+
+            decimal saldoPendiente = Math.Max(0m, importeOriginal - abonadoPrevio);
+            if (saldoPendiente <= 0)
+                throw new InvalidOperationException("Esta actividad ya está liquidada en su totalidad ($0.00 de saldo pendiente).");
+
+            decimal montoAbono = request.Importe.HasValue && request.Importe.Value > 0
+                ? request.Importe.Value
+                : saldoPendiente;
+
+            if (montoAbono <= 0)
+                throw new InvalidOperationException("El importe del abono debe ser mayor a cero.");
+
+            if (montoAbono > saldoPendiente)
+                throw new InvalidOperationException($"El importe del abono (${montoAbono:N2}) supera el saldo pendiente de la actividad (${saldoPendiente:N2}).");
 
             var caja = await _context.Cajas.FirstOrDefaultAsync(c => c.Id == request.CajaId)
                 ?? throw new InvalidOperationException("La caja seleccionada no existe.");
@@ -436,16 +545,12 @@ public class DeudasEventosService : IDeudasEventosService
             if (formaPago == "TRANSFERENCIA" && !string.Equals(caja.Tipo, "TRANSFERENCIAS", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Los pagos por TRANSFERENCIA deben registrarse obligatoriamente en la caja de Transferencias.");
 
-            decimal importe = asignacion.ActividadDeuda?.Importe ?? 0m;
-            if (importe <= 0)
-                throw new InvalidOperationException("El importe de la actividad debe ser mayor a cero.");
-
             var fechaPago = request.FechaPago.HasValue ? EnsureUtc(request.FechaPago.Value) : DateTime.UtcNow;
             var usuarioNombre = asignacion.Usuario?.Nombre ?? $"Usuario #{asignacion.UsuarioId}";
             var actividadNombre = asignacion.ActividadDeuda?.Nombre ?? "Actividad";
 
-            // 1. Actualizar saldo de la caja
-            caja.SaldoActual += importe;
+            // 1. Actualizar saldo de la caja seleccionada
+            caja.SaldoActual += montoAbono;
 
             // 2. Generar movimiento en Movimientos Bancarios (Operaciones)
             var operacion = new Operacion
@@ -453,9 +558,9 @@ public class DeudasEventosService : IDeudasEventosService
                 TipoOperacion = "ENTRADA",
                 CajaDestinoId = caja.Id,
                 FechaOperacion = fechaPago,
-                Importe = importe,
-                Concepto = $"Pago de deuda: {actividadNombre} - {usuarioNombre}",
-                Descripcion = $"Pago en {formaPago} de '{actividadNombre}' por {usuarioNombre}",
+                Importe = montoAbono,
+                Concepto = $"Abono a deuda: {actividadNombre} - {usuarioNombre}",
+                Descripcion = $"Abono de ${montoAbono:N2} en {formaPago} para '{actividadNombre}' ({usuarioNombre})",
                 Estado = "CONFIRMADA",
                 UsuarioId = currentUserId,
                 UsuarioNombre = currentUserName,
@@ -472,7 +577,7 @@ public class DeudasEventosService : IDeudasEventosService
                 AsignacionActividadDeudaId = asignacion.Id,
                 ActividadDeudaId = asignacion.ActividadDeudaId,
                 UsuarioId = asignacion.UsuarioId,
-                Importe = importe,
+                Importe = montoAbono,
                 FormaPago = formaPago,
                 CajaId = caja.Id,
                 CajaNombre = caja.Nombre,
@@ -483,8 +588,19 @@ public class DeudasEventosService : IDeudasEventosService
             };
             _context.HistorialPagosDeuda.Add(historial);
 
-            // 4. Actualizar asignación
-            asignacion.Estado = "PAGADO";
+            // 4. Evaluar nuevo saldo pendiente y estado
+            decimal nuevoAbonado = abonadoPrevio + montoAbono;
+            decimal nuevoSaldo = Math.Max(0m, importeOriginal - nuevoAbonado);
+
+            if (nuevoSaldo == 0m)
+            {
+                asignacion.Estado = "PAGADO";
+            }
+            else
+            {
+                asignacion.Estado = "PENDIENTE";
+            }
+
             asignacion.FormaPago = formaPago;
             asignacion.CajaId = caja.Id;
             asignacion.OperacionTesoreriaId = operacion.Id;
@@ -502,7 +618,7 @@ public class DeudasEventosService : IDeudasEventosService
                 Entidad = "AsignacionActividadDeuda",
                 EntidadId = asignacion.Id.ToString(),
                 FechaHora = DateTime.UtcNow,
-                Descripcion = $"Pago de ${importe:N2} MXN ({formaPago}) en '{caja.Nombre}' para '{actividadNombre}' de {usuarioNombre}. Movimiento #{operacion.Id}."
+                Descripcion = $"Abono de ${montoAbono:N2} MXN ({formaPago}) en '{caja.Nombre}' para '{actividadNombre}' de {usuarioNombre}. Saldo restante: ${nuevoSaldo:N2}. Movimiento #{operacion.Id}."
             });
 
             await _context.SaveChangesAsync();
@@ -527,7 +643,7 @@ public class DeudasEventosService : IDeudasEventosService
     {
         var nuevoEstado = (request.NuevoEstado ?? "").Trim().ToUpperInvariant();
         if (nuevoEstado != "PENDIENTE" && nuevoEstado != "NO_ASISTIO")
-            throw new InvalidOperationException("El estado destino debe ser PENDIENTE o NO_ASISTIO. Para marcar como PAGADO utiliza el registro de pago con caja y forma de pago.");
+            throw new InvalidOperationException("El estado destino debe ser PENDIENTE o NO_ASISTIO. Para marcar como PAGADO utiliza el registro de abono/pago.");
 
         using var tx = await _context.Database.BeginTransactionAsync();
         try
@@ -535,6 +651,7 @@ public class DeudasEventosService : IDeudasEventosService
             var asignacion = await _context.AsignacionesActividadDeuda
                 .Include(a => a.ActividadDeuda)
                 .Include(a => a.Caja)
+                .Include(a => a.HistorialPagos)
                 .Include(a => a.Usuario!)
                     .ThenInclude(u => u.UsuarioRoles)
                         .ThenInclude(ur => ur.RolPersonalizado)
@@ -544,24 +661,45 @@ public class DeudasEventosService : IDeudasEventosService
             if (asignacion.Usuario != null && IsUserAdmin(asignacion.Usuario) && !isAdmin)
                 throw new InvalidOperationException("No tienes permiso para modificar deudas de usuarios administradores.");
 
-            if (asignacion.Estado == "PAGADO")
+            var usuarioNombre = asignacion.Usuario?.Nombre ?? $"Usuario #{asignacion.UsuarioId}";
+            var estadoAnterior = asignacion.Estado;
+
+            // Si se marca como NO_ASISTIO y existen abonos confirmados, se deben revertir automáticamente
+            // todos los abonos activos para garantizar que recaudación neta sea $0 y deuda pendiente $0.
+            if (nuevoEstado == "NO_ASISTIO")
             {
-                // Si viene de PAGADO, revertir el pago existente de manera atómica
-                await RevertirPagoInternoAsync(
-                    asignacion,
-                    string.IsNullOrWhiteSpace(request.Motivo)
-                        ? $"Cambio de estado a {nuevoEstado}"
-                        : request.Motivo.Trim(),
-                    currentUserId,
-                    currentUserName);
+                var abonosConfirmados = (asignacion.HistorialPagos ?? Enumerable.Empty<HistorialPagoDeuda>())
+                    .Where(h => h.Estado == "CONFIRMADO")
+                    .OrderByDescending(h => h.Id)
+                    .ToList();
+
+                var motivoReversion = string.IsNullOrWhiteSpace(request.Motivo)
+                    ? "Reversión por cambio de estado a No asistió"
+                    : $"No asistió: {request.Motivo.Trim()}";
+
+                foreach (var abono in abonosConfirmados)
+                {
+                    await RevertirAbonoInternoAsync(abono, asignacion, motivoReversion, currentUserId, currentUserName);
+                }
             }
 
-            var estadoAnterior = asignacion.Estado;
             asignacion.Estado = nuevoEstado;
             asignacion.UltimaActualizacion = DateTime.UtcNow;
             asignacion.ActualizadoPor = currentUserName;
 
-            var usuarioNombre = asignacion.Usuario?.Nombre ?? $"Usuario #{asignacion.UsuarioId}";
+            // Si volvió a PENDIENTE, calcular si con abonos activos previos (si existieran) queda PAGADO o PENDIENTE
+            if (nuevoEstado == "PENDIENTE")
+            {
+                decimal importeOriginal = asignacion.ActividadDeuda?.Importe ?? 0m;
+                decimal abonado = (asignacion.HistorialPagos ?? Enumerable.Empty<HistorialPagoDeuda>())
+                    .Where(h => h.Estado == "CONFIRMADO")
+                    .Sum(h => h.Importe);
+                if (importeOriginal > 0 && abonado >= importeOriginal)
+                {
+                    asignacion.Estado = "PAGADO";
+                }
+            }
+
             _context.Auditoria.Add(new Auditoria
             {
                 UsuarioId = currentUserId,
@@ -570,7 +708,7 @@ public class DeudasEventosService : IDeudasEventosService
                 Entidad = "AsignacionActividadDeuda",
                 EntidadId = asignacion.Id.ToString(),
                 FechaHora = DateTime.UtcNow,
-                Descripcion = $"Cambio de estado de '{asignacion.ActividadDeuda?.Nombre}' ({usuarioNombre}): {estadoAnterior} -> {nuevoEstado}."
+                Descripcion = $"Cambio de estado de '{asignacion.ActividadDeuda?.Nombre}' ({usuarioNombre}): {estadoAnterior} -> {asignacion.Estado}."
             });
 
             await _context.SaveChangesAsync();
@@ -601,6 +739,7 @@ public class DeudasEventosService : IDeudasEventosService
             var asignacion = await _context.AsignacionesActividadDeuda
                 .Include(a => a.ActividadDeuda)
                 .Include(a => a.Caja)
+                .Include(a => a.HistorialPagos)
                 .Include(a => a.Usuario!)
                     .ThenInclude(u => u.UsuarioRoles)
                         .ThenInclude(ur => ur.RolPersonalizado)
@@ -610,10 +749,66 @@ public class DeudasEventosService : IDeudasEventosService
             if (asignacion.Usuario != null && IsUserAdmin(asignacion.Usuario) && !isAdmin)
                 throw new InvalidOperationException("No tienes permiso para modificar deudas de usuarios administradores.");
 
-            if (asignacion.Estado != "PAGADO")
-                throw new InvalidOperationException("Esta actividad no tiene un pago confirmado para revertir.");
+            HistorialPagoDeuda? abonoARevertir = null;
+            if (request.HistorialPagoId.HasValue && request.HistorialPagoId.Value > 0)
+            {
+                abonoARevertir = asignacion.HistorialPagos
+                    .FirstOrDefault(h => h.Id == request.HistorialPagoId.Value && h.Estado == "CONFIRMADO");
 
-            await RevertirPagoInternoAsync(asignacion, request.Motivo.Trim(), currentUserId, currentUserName);
+                if (abonoARevertir == null)
+                    throw new InvalidOperationException("No se encontró el abono confirmado especificado para revertir.");
+            }
+            else
+            {
+                // Revertir el último abono confirmado
+                abonoARevertir = asignacion.HistorialPagos
+                    .Where(h => h.Estado == "CONFIRMADO")
+                    .OrderByDescending(h => h.FechaPago)
+                    .ThenByDescending(h => h.Id)
+                    .FirstOrDefault();
+
+                if (abonoARevertir == null)
+                    throw new InvalidOperationException("Esta actividad no tiene abonos confirmados para revertir.");
+            }
+
+            await RevertirAbonoInternoAsync(abonoARevertir, asignacion, request.Motivo.Trim(), currentUserId, currentUserName);
+
+            // Recalcular saldo pendiente tras la reversión
+            decimal importeOriginal = asignacion.ActividadDeuda?.Importe ?? 0m;
+            decimal abonadoRestante = asignacion.HistorialPagos
+                .Where(h => h.Estado == "CONFIRMADO")
+                .Sum(h => h.Importe);
+
+            if (abonadoRestante < importeOriginal)
+            {
+                asignacion.Estado = "PENDIENTE";
+            }
+
+            var ultimoAbonoActivo = asignacion.HistorialPagos
+                .Where(h => h.Estado == "CONFIRMADO")
+                .OrderByDescending(h => h.FechaPago)
+                .ThenByDescending(h => h.Id)
+                .FirstOrDefault();
+
+            if (ultimoAbonoActivo != null)
+            {
+                asignacion.FormaPago = ultimoAbonoActivo.FormaPago;
+                asignacion.CajaId = ultimoAbonoActivo.CajaId;
+                asignacion.OperacionTesoreriaId = ultimoAbonoActivo.OperacionTesoreriaId;
+                asignacion.FechaPago = ultimoAbonoActivo.FechaPago;
+                asignacion.RegistradoPagoPor = ultimoAbonoActivo.RegistradoPor;
+            }
+            else
+            {
+                asignacion.FormaPago = null;
+                asignacion.CajaId = null;
+                asignacion.OperacionTesoreriaId = null;
+                asignacion.FechaPago = null;
+                asignacion.RegistradoPagoPor = null;
+            }
+
+            asignacion.UltimaActualizacion = DateTime.UtcNow;
+            asignacion.ActualizadoPor = currentUserName;
 
             await _context.SaveChangesAsync();
             await tx.CommitAsync();
@@ -628,35 +823,33 @@ public class DeudasEventosService : IDeudasEventosService
         }
     }
 
-    private async Task RevertirPagoInternoAsync(
+    private async Task RevertirAbonoInternoAsync(
+        HistorialPagoDeuda abono,
         AsignacionActividadDeuda asignacion,
         string motivo,
         int currentUserId,
         string currentUserName)
     {
-        if (!asignacion.OperacionTesoreriaId.HasValue)
-            throw new InvalidOperationException("No se encontró el movimiento bancario asociado a este pago.");
-
         var opOriginal = await _context.Operaciones
-            .FirstOrDefaultAsync(o => o.Id == asignacion.OperacionTesoreriaId.Value)
-            ?? throw new InvalidOperationException("El movimiento bancario original no existe.");
+            .FirstOrDefaultAsync(o => o.Id == abono.OperacionTesoreriaId)
+            ?? throw new InvalidOperationException($"El movimiento bancario original #{abono.OperacionTesoreriaId} no existe.");
 
         if (opOriginal.Estado == "ANULADA")
-            throw new InvalidOperationException("El movimiento original ya fue revertido anteriormente.");
+            throw new InvalidOperationException($"El movimiento bancario #{opOriginal.Id} ya fue revertido con anterioridad.");
 
         var caja = await _context.Cajas.FirstOrDefaultAsync(c => c.Id == opOriginal.CajaDestinoId)
             ?? throw new InvalidOperationException("La caja asociada al pago ya no existe.");
 
         if (caja.SaldoActual < opOriginal.Importe)
-            throw new InvalidOperationException($"No se puede revertir el pago: la caja '{caja.Nombre}' tiene saldo insuficiente (${caja.SaldoActual:N2} MXN).");
+            throw new InvalidOperationException($"No se puede revertir el abono: la caja '{caja.Nombre}' tiene saldo insuficiente (${caja.SaldoActual:N2} MXN) para descontar ${opOriginal.Importe:N2} MXN.");
 
-        // 1. Marcar operación original como ANULADA (se conserva intacta)
+        // 1. Marcar operación original como ANULADA (se conserva en histórico de Operaciones)
         opOriginal.Estado = "ANULADA";
 
-        // 2. Descontar saldo de la caja
+        // 2. Descontar saldo de la caja correspondiente
         caja.SaldoActual -= opOriginal.Importe;
 
-        // 3. Registrar operación REVERSA vinculada
+        // 3. Registrar operación REVERSA vinculada en Movimientos Bancarios
         var opReversa = new Operacion
         {
             TipoOperacion = "REVERSA",
@@ -664,53 +857,34 @@ public class DeudasEventosService : IDeudasEventosService
             CajaOrigenId = caja.Id,
             FechaOperacion = DateTime.UtcNow,
             Importe = opOriginal.Importe,
-            Concepto = $"Reversión de pago #{opOriginal.Id}: {asignacion.ActividadDeuda?.Nombre ?? "Deuda"}",
+            Concepto = $"Reversión de abono #{opOriginal.Id}: {asignacion.ActividadDeuda?.Nombre ?? "Deuda"}",
             Descripcion = motivo,
             Estado = "CONFIRMADA",
             UsuarioId = currentUserId,
             UsuarioNombre = currentUserName,
             FechaRegistro = DateTime.UtcNow,
-            Observaciones = $"Reversa de pago de deuda (AsignacionId:{asignacion.Id})"
+            Observaciones = $"Reversa de abono de deuda (AsignacionId:{asignacion.Id}|HistorialPagoId:{abono.Id})"
         };
         _context.Operaciones.Add(opReversa);
         await _context.SaveChangesAsync();
 
         // 4. Actualizar historial de pago
-        var historial = await _context.HistorialPagosDeuda
-            .Where(h => h.AsignacionActividadDeudaId == asignacion.Id && h.OperacionTesoreriaId == opOriginal.Id && h.Estado == "CONFIRMADO")
-            .OrderByDescending(h => h.Id)
-            .FirstOrDefaultAsync();
+        abono.Estado = "REVERTIDO";
+        abono.OperacionReversaId = opReversa.Id;
+        abono.FechaReversion = DateTime.UtcNow;
+        abono.RevertidoPor = currentUserName;
+        abono.MotivoReversion = motivo;
 
-        if (historial != null)
-        {
-            historial.Estado = "REVERTIDO";
-            historial.OperacionReversaId = opReversa.Id;
-            historial.FechaReversion = DateTime.UtcNow;
-            historial.RevertidoPor = currentUserName;
-            historial.MotivoReversion = motivo;
-        }
-
-        // 5. Regresar asignación a PENDIENTE
-        asignacion.Estado = "PENDIENTE";
-        asignacion.FormaPago = null;
-        asignacion.CajaId = null;
-        asignacion.OperacionTesoreriaId = null;
-        asignacion.FechaPago = null;
-        asignacion.RegistradoPagoPor = null;
-        asignacion.UltimaActualizacion = DateTime.UtcNow;
-        asignacion.ActualizadoPor = currentUserName;
-        asignacion.Caja = null;
-
-        // 6. Auditoría
+        // 5. Auditoría
         _context.Auditoria.Add(new Auditoria
         {
             UsuarioId = currentUserId,
             UsuarioNombre = currentUserName,
-            Accion = "REVERTIR_PAGO_DEUDA",
-            Entidad = "AsignacionActividadDeuda",
-            EntidadId = asignacion.Id.ToString(),
+            Accion = "REVERTIR_ABONO_DEUDA",
+            Entidad = "HistorialPagoDeuda",
+            EntidadId = abono.Id.ToString(),
             FechaHora = DateTime.UtcNow,
-            Descripcion = $"Reversión de pago de ${opOriginal.Importe:N2} MXN (Op #{opOriginal.Id} -> Reversa #{opReversa.Id}) de '{asignacion.ActividadDeuda?.Nombre}'. Motivo: {motivo}"
+            Descripcion = $"Reversión de abono de ${opOriginal.Importe:N2} MXN (Op #{opOriginal.Id} -> Reversa #{opReversa.Id}) de '{asignacion.ActividadDeuda?.Nombre}'. Motivo: {motivo}"
         });
     }
 

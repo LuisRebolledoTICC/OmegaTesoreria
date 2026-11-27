@@ -74,19 +74,28 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
   const [savingAct, setSavingAct] = useState(false);
   const [actError, setActError] = useState<string | null>(null);
 
-  // Modal Registrar Pago
+  // Modal Registrar Abono / Pago
   const [pagandoAsig, setPagandoAsig] = useState<AsignacionDeuda | null>(null);
+  const [montoAbono, setMontoAbono] = useState<string>('');
   const [formaPago, setFormaPago] = useState<'EFECTIVO' | 'TRANSFERENCIA'>('EFECTIVO');
   const [cajaPagoId, setCajaPagoId] = useState<number>(0);
   const [fechaPago, setFechaPago] = useState(() => new Date().toISOString().slice(0, 10));
   const [savingPago, setSavingPago] = useState(false);
   const [pagoError, setPagoError] = useState<string | null>(null);
 
-  // Modal Revertir Pago
+  // Modal Revertir Pago / Abono
   const [revirtiendoAsig, setRevirtiendoAsig] = useState<AsignacionDeuda | null>(null);
+  const [revirtiendoAbono, setRevirtiendoAbono] = useState<HistorialPagoDeuda | null>(null);
   const [motivoReversion, setMotivoReversion] = useState('');
   const [savingReversion, setSavingReversion] = useState(false);
   const [reversionError, setReversionError] = useState<string | null>(null);
+
+  // Expansión de historial de abonos por actividad
+  const [expandedAbonos, setExpandedAbonos] = useState<Record<number, boolean>>({});
+
+  const toggleExpandAbonos = (asigId: number) => {
+    setExpandedAbonos((prev) => ({ ...prev, [asigId]: !prev[asigId] }));
+  };
 
   const cajasEfectivo = cajas.filter((c) => c.activa && c.tipo !== 'TRANSFERENCIAS');
   const cajasTransferencia = cajas.filter((c) => c.activa && c.tipo === 'TRANSFERENCIAS');
@@ -212,6 +221,7 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
 
   const openPagarModal = (asig: AsignacionDeuda) => {
     setPagandoAsig(asig);
+    setMontoAbono(asig.saldoPendiente > 0 ? String(asig.saldoPendiente) : String(asig.importeOriginal));
     const defaultForma: 'EFECTIVO' | 'TRANSFERENCIA' = cajasEfectivo.length > 0 ? 'EFECTIVO' : 'TRANSFERENCIA';
     setFormaPago(defaultForma);
     if (defaultForma === 'EFECTIVO') {
@@ -235,6 +245,15 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
   const handleConfirmPago = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pagandoAsig) return;
+    const monto = Number(montoAbono);
+    if (isNaN(monto) || monto <= 0) {
+      setPagoError('El importe a abonar debe ser mayor a cero.');
+      return;
+    }
+    if (monto > pagandoAsig.saldoPendiente) {
+      setPagoError(`El importe no puede superar el saldo pendiente (${formatMoney(pagandoAsig.saldoPendiente)}).`);
+      return;
+    }
     if (!cajaPagoId) {
       setPagoError('Debes seleccionar una caja compatible con la forma de pago.');
       return;
@@ -244,32 +263,34 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
     setPagoError(null);
     try {
       await api.registrarPagoDeuda(pagandoAsig.id, {
+        importe: monto,
         formaPago,
         cajaId: cajaPagoId,
         fechaPago: new Date(fechaPago + 'T12:00:00Z').toISOString(),
       });
       setPagandoAsig(null);
-      setSuccessMsg('Pago registrado correctamente y reflejado en Movimientos Bancarios.');
+      setSuccessMsg(`Abono de ${formatMoney(monto)} registrado correctamente y reflejado en Movimientos Bancarios.`);
       onBalanceChanged();
       if (selectedUserId !== null) await loadDetalleUsuario(selectedUserId);
       if (canVerTodos) setResumenGlobal(await api.getDeudasResumenGlobal());
     } catch (err: any) {
-      setPagoError(err.message || 'No se pudo registrar el pago.');
+      setPagoError(err.message || 'No se pudo registrar el abono.');
     } finally {
       setSavingPago(false);
     }
   };
 
   const handleCambiarEstado = async (asig: AsignacionDeuda, nuevoEstado: 'PENDIENTE' | 'NO_ASISTIO') => {
-    if (asig.estado === 'PAGADO') {
-      if (!confirm(`Esta actividad ya tiene un pago registrado. Al marcarla como "${nuevoEstado === 'NO_ASISTIO' ? 'No asistió' : 'Pendiente'}", se revertirá el pago anterior y se ajustará el saldo de la caja. ¿Continuar?`)) {
+    const tieneAbonos = (asig.abonos ?? []).some((a) => a.estado === 'CONFIRMADO') || asig.totalAbonado > 0;
+    if (nuevoEstado === 'NO_ASISTIO' && tieneAbonos) {
+      if (!confirm(`Esta actividad tiene ${formatMoney(asig.totalAbonado)} en abonos recibidos. Al marcarla como "No asistió", se revertirán automáticamente todos los abonos activos, el dinero recibido se devolverá a las cajas correspondientes mediante reversiones bancarias, y la deuda terminará en $0. ¿Deseas continuar?`)) {
         return;
       }
     }
     try {
       await api.cambiarEstadoDeuda(asig.id, { nuevoEstado });
       setSuccessMsg(`Estado actualizado a ${nuevoEstado === 'NO_ASISTIO' ? 'No asistió' : 'Pendiente'}.`);
-      if (asig.estado === 'PAGADO') onBalanceChanged();
+      if (tieneAbonos) onBalanceChanged();
       if (selectedUserId !== null) await loadDetalleUsuario(selectedUserId);
       if (canVerTodos) setResumenGlobal(await api.getDeudasResumenGlobal());
     } catch (err: any) {
@@ -277,8 +298,9 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
     }
   };
 
-  const openRevertirModal = (asig: AsignacionDeuda) => {
+  const openRevertirModal = (asig: AsignacionDeuda, abono?: HistorialPagoDeuda) => {
     setRevirtiendoAsig(asig);
+    setRevirtiendoAbono(abono || null);
     setMotivoReversion('');
     setReversionError(null);
   };
@@ -294,14 +316,15 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
     setSavingReversion(true);
     setReversionError(null);
     try {
-      await api.revertirPagoDeuda(revirtiendoAsig.id, motivoReversion.trim());
+      await api.revertirPagoDeuda(revirtiendoAsig.id, motivoReversion.trim(), revirtiendoAbono?.id);
       setRevirtiendoAsig(null);
-      setSuccessMsg('Pago revertido correctamente. El saldo de la caja y la deuda del usuario fueron actualizados.');
+      setRevirtiendoAbono(null);
+      setSuccessMsg('Reversión aplicada correctamente. El saldo de la caja y el saldo pendiente de la actividad fueron recalculados.');
       onBalanceChanged();
       if (selectedUserId !== null) await loadDetalleUsuario(selectedUserId);
       if (canVerTodos) setResumenGlobal(await api.getDeudasResumenGlobal());
     } catch (err: any) {
-      setReversionError(err.message || 'No se pudo revertir el pago.');
+      setReversionError(err.message || 'No se pudo revertir el abono.');
     } finally {
       setSavingReversion(false);
     }
@@ -349,113 +372,218 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
                   <tr>
                     <th className="py-3 px-4">Actividad</th>
                     <th className="py-3 px-4">Fecha</th>
-                    <th className="py-3 px-4 text-right">Importe</th>
+                    <th className="py-3 px-4 text-right">Importe Original</th>
+                    <th className="py-3 px-4 text-right">Total Abonado</th>
+                    <th className="py-3 px-4 text-right">Saldo Pendiente</th>
                     <th className="py-3 px-4 text-center">Estado</th>
-                    <th className="py-3 px-4 text-right">Deuda</th>
-                    <th className="py-3 px-4">Forma de Pago / Caja</th>
+                    <th className="py-3 px-4 text-center">Historial Abonos</th>
                     {allowActions && <th className="py-3 px-4 text-center">Acciones</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {detalle.actividades.map((a) => (
-                    <tr key={a.id} className="hover:bg-slate-50">
-                      <td className="py-3 px-4">
-                        <p className="font-bold text-slate-900">{a.actividadNombre}</p>
-                        {a.actividadDescripcion && (
-                          <p className="text-[11px] text-slate-500">{a.actividadDescripcion}</p>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
-                        {new Date(a.fechaActividad).toLocaleDateString('es-MX')}
-                      </td>
-                      <td className="py-3 px-4 text-right font-semibold text-slate-800 whitespace-nowrap">
-                        {formatMoney(a.importeOriginal)}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <span
-                          className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                            a.estado === 'PAGADO'
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                              : a.estado === 'NO_ASISTIO'
-                              ? 'bg-slate-100 text-slate-600 border-slate-300'
-                              : 'bg-rose-50 text-rose-800 border-rose-200'
-                          }`}
-                        >
-                          {a.estado === 'PAGADO' ? 'Pagado' : a.estado === 'NO_ASISTIO' ? 'No asistió' : 'Pendiente'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right font-bold whitespace-nowrap">
-                        <span className={a.deudaCorrespondiente > 0 ? 'text-rose-700' : 'text-slate-500'}>
-                          {formatMoney(a.deudaCorrespondiente)}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        {a.estado === 'PAGADO' ? (
-                          <div className="space-y-0.5">
+                  {detalle.actividades.map((a) => {
+                    const isExpanded = !!expandedAbonos[a.id];
+                    const numAbonos = a.abonos?.length ?? 0;
+                    return (
+                      <React.Fragment key={a.id}>
+                        <tr className="hover:bg-slate-50">
+                          <td className="py-3 px-4">
+                            <p className="font-bold text-slate-900">{a.actividadNombre}</p>
+                            {a.actividadDescripcion && (
+                              <p className="text-[11px] text-slate-500">{a.actividadDescripcion}</p>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
+                            {new Date(a.fechaActividad).toLocaleDateString('es-MX')}
+                          </td>
+                          <td className="py-3 px-4 text-right font-semibold text-slate-800 whitespace-nowrap">
+                            {formatMoney(a.importeOriginal)}
+                          </td>
+                          <td className="py-3 px-4 text-right font-semibold text-emerald-700 whitespace-nowrap">
+                            {formatMoney(a.totalAbonado)}
+                          </td>
+                          <td className="py-3 px-4 text-right font-bold whitespace-nowrap">
+                            <span className={a.saldoPendiente > 0 ? 'text-rose-700 font-black' : 'text-slate-500'}>
+                              {formatMoney(a.saldoPendiente)}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center">
                             <span
-                              className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                                a.formaPago === 'EFECTIVO'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-blue-100 text-blue-800'
+                              className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                a.estado === 'PAGADO'
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                  : a.estado === 'NO_ASISTIO'
+                                  ? 'bg-slate-100 text-slate-600 border-slate-300'
+                                  : 'bg-rose-50 text-rose-800 border-rose-200'
                               }`}
                             >
-                              {a.formaPago}
+                              {a.estado === 'PAGADO' ? 'Pagado' : a.estado === 'NO_ASISTIO' ? 'No asistió' : 'Pendiente'}
                             </span>
-                            {a.cajaNombre && (
-                              <p className="text-[11px] text-slate-600 font-medium">{a.cajaNombre}</p>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">-</span>
+                          </td>
+                          <td className="py-3 px-4 text-center whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => toggleExpandAbonos(a.id)}
+                              className={`px-2 py-1 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 mx-auto cursor-pointer ${
+                                isExpanded
+                                  ? 'bg-slate-900 text-amber-400'
+                                  : numAbonos > 0
+                                  ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                  : 'bg-slate-50 text-slate-400 hover:bg-slate-100'
+                              }`}
+                              title="Ver historial de abonos de esta actividad"
+                            >
+                              <History className="w-3 h-3" />
+                              <span>{numAbonos} abono(s)</span>
+                            </button>
+                          </td>
+                          {allowActions && (
+                            <td className="py-3 px-4 text-center whitespace-nowrap">
+                              <div className="flex items-center justify-center gap-1.5">
+                                {a.estado !== 'PAGADO' && a.estado !== 'NO_ASISTIO' && a.saldoPendiente > 0 && canRegistrarPago && (
+                                  <button
+                                    type="button"
+                                    onClick={() => openPagarModal(a)}
+                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition cursor-pointer"
+                                  >
+                                    Abonar / Pagar
+                                  </button>
+                                )}
+                                {a.estado === 'PENDIENTE' && (canAsignarActividad || canRegistrarPago) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCambiarEstado(a, 'NO_ASISTIO')}
+                                    className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                                    title="Marcar como No asistió (deuda $0, sin recaudación)"
+                                  >
+                                    No asistió
+                                  </button>
+                                )}
+                                {a.estado === 'NO_ASISTIO' && (canAsignarActividad || canRegistrarPago) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCambiarEstado(a, 'PENDIENTE')}
+                                    className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                                  >
+                                    Volver a Pendiente
+                                  </button>
+                                )}
+                                {a.estado === 'PAGADO' && canRevertirPago && (
+                                  <button
+                                    type="button"
+                                    onClick={() => openRevertirModal(a)}
+                                    className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                                    title="Revertir último abono"
+                                  >
+                                    <RotateCcw className="w-3 h-3" />
+                                    <span>Revertir</span>
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+
+                        {/* Desglose de abonos de la actividad */}
+                        {isExpanded && (
+                          <tr className="bg-slate-50/80">
+                            <td colSpan={allowActions ? 8 : 7} className="p-3 border-y border-slate-200">
+                              <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-xs space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                    <History className="w-3.5 h-3.5 text-slate-500" />
+                                    <span>Historial de Abonos: {a.actividadNombre}</span>
+                                  </h4>
+                                  <span className="text-[11px] text-slate-500 font-semibold">
+                                    Total abonado: <strong className="text-emerald-700">{formatMoney(a.totalAbonado)}</strong> de {formatMoney(a.importeOriginal)}
+                                  </span>
+                                </div>
+
+                                {(!a.abonos || a.abonos.length === 0) ? (
+                                  <p className="text-[11px] text-slate-400 py-2 text-center">
+                                    No hay abonos registrados para esta actividad.
+                                  </p>
+                                ) : (
+                                  <table className="w-full text-[11px] text-left">
+                                    <thead className="bg-slate-100 text-slate-600 font-bold uppercase border-b border-slate-200">
+                                      <tr>
+                                        <th className="py-1.5 px-3">Fecha</th>
+                                        <th className="py-1.5 px-3 text-right">Importe</th>
+                                        <th className="py-1.5 px-3">Forma de Pago</th>
+                                        <th className="py-1.5 px-3">Caja</th>
+                                        <th className="py-1.5 px-3">Registrado Por</th>
+                                        <th className="py-1.5 px-3">Mov. Bancario</th>
+                                        <th className="py-1.5 px-3 text-center">Estado</th>
+                                        {allowActions && canRevertirPago && <th className="py-1.5 px-3 text-center">Acción</th>}
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                      {a.abonos.map((abono) => (
+                                        <tr key={abono.id} className="hover:bg-slate-50">
+                                          <td className="py-1.5 px-3 whitespace-nowrap text-slate-600">
+                                            {new Date(abono.fechaPago).toLocaleString('es-MX')}
+                                          </td>
+                                          <td className="py-1.5 px-3 text-right font-bold text-slate-900 whitespace-nowrap">
+                                            {formatMoney(abono.importe)}
+                                          </td>
+                                          <td className="py-1.5 px-3">
+                                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                              abono.formaPago === 'EFECTIVO' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
+                                            }`}>
+                                              {abono.formaPago}
+                                            </span>
+                                          </td>
+                                          <td className="py-1.5 px-3 font-medium text-slate-700">
+                                            {abono.cajaNombre}
+                                          </td>
+                                          <td className="py-1.5 px-3 text-slate-600">
+                                            {abono.registradoPor}
+                                          </td>
+                                          <td className="py-1.5 px-3 font-mono text-slate-600">
+                                            Op #{abono.operacionTesoreriaId}
+                                            {abono.operacionReversaId && (
+                                              <span className="text-rose-600"> (Rev #{abono.operacionReversaId})</span>
+                                            )}
+                                          </td>
+                                          <td className="py-1.5 px-3 text-center">
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                              abono.estado === 'CONFIRMADO'
+                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                            }`}>
+                                              {abono.estado}
+                                            </span>
+                                            {abono.estado === 'REVERTIDO' && abono.motivoReversion && (
+                                              <p className="text-[10px] text-rose-600 mt-0.5">{abono.motivoReversion}</p>
+                                            )}
+                                          </td>
+                                          {allowActions && canRevertirPago && (
+                                            <td className="py-1.5 px-3 text-center whitespace-nowrap">
+                                              {abono.estado === 'CONFIRMADO' && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => openRevertirModal(a, abono)}
+                                                  className="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-[10px] font-bold inline-flex items-center gap-1 transition cursor-pointer"
+                                                  title="Revertir este abono específico"
+                                                >
+                                                  <RotateCcw className="w-2.5 h-2.5" />
+                                                  <span>Revertir</span>
+                                                </button>
+                                              )}
+                                            </td>
+                                          )}
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
                         )}
-                      </td>
-                      {allowActions && (
-                        <td className="py-3 px-4 text-center whitespace-nowrap">
-                          <div className="flex items-center justify-center gap-1.5">
-                            {a.estado !== 'PAGADO' && canRegistrarPago && (
-                              <button
-                                type="button"
-                                onClick={() => openPagarModal(a)}
-                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition cursor-pointer"
-                              >
-                                Pagar
-                              </button>
-                            )}
-                            {a.estado === 'PENDIENTE' && (canAsignarActividad || canRegistrarPago) && (
-                              <button
-                                type="button"
-                                onClick={() => handleCambiarEstado(a, 'NO_ASISTIO')}
-                                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition cursor-pointer"
-                                title="Marcar como No asistió (deuda $0, sin ingreso)"
-                              >
-                                No asistió
-                              </button>
-                            )}
-                            {a.estado === 'NO_ASISTIO' && (canAsignarActividad || canRegistrarPago) && (
-                              <button
-                                type="button"
-                                onClick={() => handleCambiarEstado(a, 'PENDIENTE')}
-                                className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-[11px] font-bold transition cursor-pointer"
-                              >
-                                Volver a Pendiente
-                              </button>
-                            )}
-                            {a.estado === 'PAGADO' && canRevertirPago && (
-                              <button
-                                type="button"
-                                onClick={() => openRevertirModal(a)}
-                                className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
-                                title="Revertir pago registrado por error"
-                              >
-                                <RotateCcw className="w-3 h-3" />
-                                <span>Revertir</span>
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -945,15 +1073,15 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
         </div>
       )}
 
-      {/* MODAL REGISTRAR PAGO */}
+      {/* MODAL REGISTRAR ABONO / PAGO */}
       {pagandoAsig && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 className="text-lg font-bold text-slate-900">Registrar Pago de Deuda</h3>
+                <h3 className="text-lg font-bold text-slate-900">Registrar Abono a Deuda</h3>
                 <p className="text-xs text-slate-500">
-                  {pagandoAsig.usuarioNombre} · {pagandoAsig.actividadNombre} ({formatMoney(pagandoAsig.importeOriginal)})
+                  {pagandoAsig.usuarioNombre} · {pagandoAsig.actividadNombre}
                 </p>
               </div>
               <button type="button" onClick={() => setPagandoAsig(null)} className="text-slate-400 hover:text-slate-600">
@@ -961,11 +1089,54 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
               </button>
             </div>
 
+            {/* Resumen de importes */}
+            <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 text-center">
+              <div>
+                <p className="text-[10px] uppercase font-bold text-slate-500">Original</p>
+                <p className="text-xs font-bold text-slate-800">{formatMoney(pagandoAsig.importeOriginal)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-bold text-emerald-600">Abonado</p>
+                <p className="text-xs font-bold text-emerald-700">{formatMoney(pagandoAsig.totalAbonado)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-bold text-rose-600">Saldo Pendiente</p>
+                <p className="text-xs font-bold text-rose-700">{formatMoney(pagandoAsig.saldoPendiente)}</p>
+              </div>
+            </div>
+
             {pagoError && (
               <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs">{pagoError}</div>
             )}
 
             <form onSubmit={handleConfirmPago} className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-700 uppercase">Importe del Abono (MXN) *</label>
+                  <button
+                    type="button"
+                    onClick={() => setMontoAbono(String(pagandoAsig.saldoPendiente))}
+                    className="text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer"
+                  >
+                    Liquidar saldo completo ({formatMoney(pagandoAsig.saldoPendiente)})
+                  </button>
+                </div>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max={pagandoAsig.saldoPendiente}
+                  required
+                  value={montoAbono}
+                  onChange={(e) => setMontoAbono(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-bold text-slate-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  placeholder="0.00"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Puedes registrar un pago parcial. Si el saldo llega a $0.00, la actividad pasará automáticamente a Pagado.
+                </p>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Forma de Pago *</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1039,7 +1210,7 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
                   Cancelar
                 </button>
                 <button type="submit" disabled={savingPago || !cajaPagoId} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold">
-                  {savingPago ? 'Registrando...' : 'Confirmar Pago'}
+                  {savingPago ? 'Registrando...' : 'Confirmar Abono'}
                 </button>
               </div>
             </form>
@@ -1047,17 +1218,24 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
         </div>
       )}
 
-      {/* MODAL REVERTIR PAGO */}
+      {/* MODAL REVERTIR ABONO / PAGO */}
       {revirtiendoAsig && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
             <h3 className="text-lg font-bold text-rose-900 flex items-center gap-2">
               <RotateCcw className="w-5 h-5" />
-              <span>Revertir Pago Registrado</span>
+              <span>Revertir Abono Registrado</span>
             </h3>
             <p className="text-xs text-slate-600">
-              Se revertirá el pago de <strong>{formatMoney(revirtiendoAsig.importeOriginal)}</strong> de{' '}
-              <strong>{revirtiendoAsig.usuarioNombre}</strong> ({revirtiendoAsig.actividadNombre}). El movimiento original se conservará marcado como anulado y se generará su reversión bancaria.
+              {revirtiendoAbono ? (
+                <>
+                  Se revertirá el abono de <strong>{formatMoney(revirtiendoAbono.importe)}</strong> ({revirtiendoAbono.formaPago}) en <strong>{revirtiendoAbono.cajaNombre}</strong> de <strong>{revirtiendoAsig.usuarioNombre}</strong> ({revirtiendoAsig.actividadNombre}).
+                </>
+              ) : (
+                <>
+                  Se revertirá el abono más reciente de <strong>{revirtiendoAsig.usuarioNombre}</strong> ({revirtiendoAsig.actividadNombre}).
+                </>
+              )} El movimiento original se conservará en Movimientos Bancarios marcado como anulado y se generará una operación REVERSA descontando el dinero de la caja.
             </p>
             {reversionError && (
               <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs">{reversionError}</div>
@@ -1070,12 +1248,12 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
                   rows={3}
                   value={motivoReversion}
                   onChange={(e) => setMotivoReversion(e.target.value)}
-                  placeholder="Ej. Pago registrado por error en usuario equivocado"
+                  placeholder="Ej. Abono registrado por error en usuario o caja equivocada"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none"
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setRevirtiendoAsig(null)} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-xs font-bold">
+                <button type="button" onClick={() => { setRevirtiendoAsig(null); setRevirtiendoAbono(null); }} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-xs font-bold">
                   Cancelar
                 </button>
                 <button type="submit" disabled={savingReversion} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold">

@@ -10,6 +10,12 @@ using OmegaTesoreria.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+if (args.Contains("--test-deudas"))
+{
+    var code = await OmegaTesoreria.Api.Tests.DeudasEventosTests.RunAllTestsAsync();
+    Environment.Exit(code);
+}
+
 // Soporte para despliegue en web pública (Render, Railway, Fly.io, etc.)
 var port = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrEmpty(port))

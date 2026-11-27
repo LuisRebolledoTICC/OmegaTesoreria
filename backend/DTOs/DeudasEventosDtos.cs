@@ -56,6 +56,8 @@ public record AsignacionDeudaDto(
     int UsuarioId,
     string UsuarioNombre,
     string Estado,
+    decimal TotalAbonado,
+    decimal SaldoPendiente,
     decimal DeudaCorrespondiente,
     string? FormaPago,
     int? CajaId,
@@ -63,7 +65,8 @@ public record AsignacionDeudaDto(
     int? OperacionTesoreriaId,
     DateTime? FechaPago,
     string? RegistradoPagoPor,
-    DateTime FechaAsignacion
+    DateTime FechaAsignacion,
+    List<HistorialPagoDeudaDto>? Abonos = null
 );
 
 public record UsuarioDeudaDetalleDto(
@@ -72,6 +75,7 @@ public record UsuarioDeudaDetalleDto(
 );
 
 public record RegistrarPagoDeudaRequest(
+    decimal? Importe, // Opcional: si es null o <= 0, abona el saldo pendiente completo
     string FormaPago, // EFECTIVO | TRANSFERENCIA
     int CajaId,
     DateTime? FechaPago
@@ -83,7 +87,8 @@ public record CambiarEstadoAsignacionRequest(
 );
 
 public record RevertirPagoDeudaRequest(
-    string Motivo
+    string Motivo,
+    int? HistorialPagoId = null // Opcional: id específico del abono a revertir
 );
 
 public record HistorialPagoDeudaDto(

@@ -939,6 +939,7 @@ export const api = {
   },
 
   async registrarPagoDeuda(asignacionId: number, data: {
+    importe?: number;
     formaPago: 'EFECTIVO' | 'TRANSFERENCIA';
     cajaId: number;
     fechaPago?: string;
@@ -963,11 +964,11 @@ export const api = {
     return handleResponse<AsignacionDeuda>(res);
   },
 
-  async revertirPagoDeuda(asignacionId: number, motivo: string): Promise<AsignacionDeuda> {
+  async revertirPagoDeuda(asignacionId: number, motivo: string, historialPagoId?: number): Promise<AsignacionDeuda> {
     const res = await fetch(`${API_BASE_URL}/deudas/asignaciones/${asignacionId}/revertir-pago`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ motivo }),
+      body: JSON.stringify({ motivo, historialPagoId }),
     });
     return handleResponse<AsignacionDeuda>(res);
   },

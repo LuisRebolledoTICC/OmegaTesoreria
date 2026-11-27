@@ -273,7 +273,7 @@ export const InicioView: React.FC<InicioViewProps> = ({ setActiveTab }) => {
         </div>
       </div>
 
-      {showPerfil && <PerfilModal onClose={() => setShowPerfil(false)} />}
+      <PerfilModal isOpen={showPerfil} onClose={() => setShowPerfil(false)} />
     </div>
   );
 };

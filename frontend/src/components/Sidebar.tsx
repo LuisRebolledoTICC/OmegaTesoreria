@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
+  Home,
   LayoutDashboard,
   Wallet,
   Calculator,
@@ -12,6 +13,8 @@ import {
   Building2,
   Package,
   PiggyBank,
+  Receipt,
+  Calendar,
   X,
   UserCog,
   ChevronUp
@@ -20,7 +23,10 @@ import { useAuth } from '../context/AuthContext';
 import { PerfilModal } from './PerfilModal';
 
 export type ActiveTab =
+  | 'inicio'
   | 'dashboard'
+  | 'deudas'
+  | 'eventos'
   | 'ventas'
   | 'cajas'
   | 'conteo'
@@ -90,13 +96,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
+  const canSeeDeudas =
+    canAccessModule('deudas_consultar_propias') ||
+    canAccessModule('deudas_consultar_todos') ||
+    canAccessModule('deudas_consultar_detalle') ||
+    canAccessModule('deudas_actividades_crear') ||
+    canAccessModule('deudas_actividades_editar') ||
+    canAccessModule('deudas_actividades_asignar') ||
+    canAccessModule('deudas_pagos_registrar') ||
+    canAccessModule('deudas_pagos_revertir') ||
+    canAccessModule('deudas_pagos_historial') ||
+    canAccessModule('deudas_movimientos_bancarios');
+
+  const canSeeEventos =
+    canAccessModule('eventos_consultar') ||
+    canAccessModule('eventos_crear') ||
+    canAccessModule('eventos_editar') ||
+    canAccessModule('eventos_cancelar') ||
+    canAccessModule('eventos_eliminar');
+
   const navItems = [
+    { id: 'inicio' as ActiveTab, label: 'Inicio Omega', icon: Home, show: canAccessModule('inicio') },
     { id: 'dashboard' as ActiveTab, label: 'Dashboard', icon: LayoutDashboard, show: canAccessModule('dashboard') },
+    { id: 'deudas' as ActiveTab, label: 'Deudas', icon: Receipt, show: canSeeDeudas },
+    { id: 'eventos' as ActiveTab, label: 'Eventos', icon: Calendar, show: canSeeEventos },
     { id: 'ventas' as ActiveTab, label: 'Ventas y Pedidos', icon: ShoppingBag, show: canAccessModule('ventas') },
     { id: 'cajas' as ActiveTab, label: 'Cajas de Tesorería', icon: Wallet, show: canAccessModule('cajas') },
     { id: 'conteo' as ActiveTab, label: 'Conteo de Efectivo', icon: Calculator, show: canAccessModule('conteo') },
     { id: 'operaciones' as ActiveTab, label: 'Movimientos por Caja', icon: ArrowLeftRight, show: canAccessModule('operaciones') },
-    { id: 'presupuestos' as ActiveTab, label: 'Presupuestos', icon: PiggyBank, show: canAccessModule('presupuestos') || canAccessModule('presupuestos_ver_todos') || canAccessModule('presupuestos_administrar') },
+    { id: 'presupuestos' as ActiveTab, label: 'Presupuestos', icon: PiggyBank, show: canAccessModule('presupuestos') || canAccessModule('presupuestos_ver_todos') || canAccessModule('presupuestos_administrar') || canAccessModule('presupuestos_consultar_mi_area') || canAccessModule('presupuestos_consultar_todos') },
     { id: 'areas' as ActiveTab, label: 'Áreas', icon: Building2, show: canAccessModule('areas') },
     { id: 'inventarios' as ActiveTab, label: 'Inventarios', icon: Package, show: canAccessModule('inventarios') || canAccessModule('inventarios_ver_todos') },
     { id: 'reportes' as ActiveTab, label: 'Reportes y Excel', icon: FileSpreadsheet, show: canAccessModule('reportes') },

@@ -13,10 +13,12 @@ namespace OmegaTesoreria.Api.Controllers;
 public class ConteosController : ControllerBase
 {
     private readonly ITesoreriaService _tesoreriaService;
+    private readonly IAuthService _authService;
 
-    public ConteosController(ITesoreriaService tesoreriaService)
+    public ConteosController(ITesoreriaService tesoreriaService, IAuthService authService)
     {
         _tesoreriaService = tesoreriaService;
+        _authService = authService;
     }
 
     [HttpGet]
@@ -27,17 +29,22 @@ public class ConteosController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Administrador,Tesorero")]
+    [Authorize]
     public async Task<IActionResult> Registrar([FromBody] SaveConteoRequest request)
     {
         try
         {
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "1");
             var userName = User.Identity?.Name ?? "Usuario";
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Tesorero";
+            if (!await _authService.HasPermissionAsync(userName, "conteo"))
+            {
+                return StatusCode(403, new { message = "No tienes permiso para realizar conteos de efectivo." });
+            }
+
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "1");
+            var isAdmin = User.IsInRole("Administrador");
 
             // Si solicita ajuste y no es administrador, verificar permisos
-            if (request.AplicarAjuste && userRole != "Administrador")
+            if (request.AplicarAjuste && !isAdmin)
             {
                 return Forbid();
             }
@@ -101,13 +108,18 @@ public class OperacionesController : ControllerBase
     }
 
     [HttpPost("salida")]
-    [Authorize(Roles = "Administrador,Tesorero")]
+    [Authorize]
     public async Task<IActionResult> RegistrarSalida([FromBody] SalidaRequest request)
     {
         try
         {
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "1");
             var userName = User.Identity?.Name ?? "Usuario";
+            if (!await _authService.HasPermissionAsync(userName, "operaciones"))
+            {
+                return StatusCode(403, new { message = "No tienes permiso para realizar salidas de caja." });
+            }
+
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "1");
             var op = await _tesoreriaService.RegistrarSalidaAsync(request, userId, userName);
             return Ok(op);
         }
@@ -118,13 +130,18 @@ public class OperacionesController : ControllerBase
     }
 
     [HttpPost("transferencia")]
-    [Authorize(Roles = "Administrador,Tesorero")]
+    [Authorize]
     public async Task<IActionResult> RegistrarTransferencia([FromBody] TransferenciaRequest request)
     {
         try
         {
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "1");
             var userName = User.Identity?.Name ?? "Usuario";
+            if (!await _authService.HasPermissionAsync(userName, "operaciones"))
+            {
+                return StatusCode(403, new { message = "No tienes permiso para realizar transferencias entre cajas." });
+            }
+
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "1");
             var op = await _tesoreriaService.RegistrarTransferenciaAsync(request, userId, userName);
             return Ok(op);
         }

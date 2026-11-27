@@ -20,6 +20,7 @@ public static class DbInitializer
             await EnsureSqliteAreasInventariosTablesAsync(context);
             await EnsureSqliteUsuarioRolesTableAsync(context);
             await EnsureSqlitePresupuestosTablesAsync(context);
+            await EnsureSqliteDeudasEventosTablesAsync(context);
         }
         else
         {
@@ -64,9 +65,44 @@ public static class DbInitializer
         {
             // Asegurar que los módulos nuevos estén habilitados en los roles base si no los tenían
             var roles = await context.RolesPersonalizados.ToListAsync();
-            var adminExtras = new[] { "ventas", "entradas", "areas", "inventarios", "areas_crear", "areas_editar", "areas_desactivar", "areas_coordinador", "areas_integrantes", "inventarios_ver_todos", "inventarios_registrar", "inventarios_editar", "inventarios_eliminar", "inventarios_fisico", "inventarios_historial", "inventarios_exportar", "presupuestos", "presupuestos_ver_todos", "presupuestos_egresos_registrar", "presupuestos_egresos_editar", "presupuestos_egresos_cancelar", "presupuestos_historial", "presupuestos_asignar", "presupuestos_devolver", "presupuestos_ajustes", "presupuestos_administrar", "presupuestos_consultar_mi_area", "presupuestos_consultar_todos", "cajas_editar_movimientos" };
-            var tesoreroExtras = new[] { "ventas", "entradas", "areas", "inventarios", "areas_integrantes", "inventarios_registrar", "inventarios_editar", "inventarios_eliminar", "inventarios_fisico", "inventarios_historial", "inventarios_exportar", "presupuestos_consultar_mi_area", "cajas_editar_movimientos" };
-            var consultaExtras = new[] { "ventas", "areas", "inventarios", "inventarios_historial", "presupuestos_consultar_mi_area" };;
+            var adminExtras = new[]
+            {
+                "inicio", "ventas", "entradas", "areas", "inventarios", "areas_crear", "areas_editar", "areas_desactivar",
+                "areas_coordinador", "areas_integrantes", "inventarios_ver_todos", "inventarios_registrar", "inventarios_editar",
+                "inventarios_eliminar", "inventarios_fisico", "inventarios_historial", "inventarios_exportar",
+                "presupuestos", "presupuestos_ver_todos", "presupuestos_egresos_registrar", "presupuestos_egresos_editar",
+                "presupuestos_egresos_cancelar", "presupuestos_historial", "presupuestos_asignar", "presupuestos_devolver",
+                "presupuestos_ajustes", "presupuestos_administrar", "presupuestos_consultar_mi_area", "presupuestos_consultar_todos",
+                "cajas_editar_movimientos",
+                "deudas_consultar_propias", "deudas_consultar_todos", "deudas_consultar_detalle",
+                "deudas_actividades_crear", "deudas_actividades_editar", "deudas_actividades_asignar",
+                "deudas_pagos_registrar", "deudas_pagos_revertir", "deudas_pagos_historial", "deudas_movimientos_bancarios",
+                "eventos_consultar", "eventos_crear", "eventos_editar", "eventos_cancelar", "eventos_eliminar"
+            };
+            var tesoreroExtras = new[]
+            {
+                "inicio", "ventas", "entradas", "areas", "inventarios", "areas_integrantes", "inventarios_registrar",
+                "inventarios_editar", "inventarios_eliminar", "inventarios_fisico", "inventarios_historial", "inventarios_exportar",
+                "presupuestos_consultar_mi_area", "cajas_editar_movimientos",
+                "deudas_consultar_propias", "eventos_consultar"
+            };
+            var consultaExtras = new[]
+            {
+                "inicio", "ventas", "areas", "inventarios", "inventarios_historial",
+                "presupuestos_consultar_mi_area", "deudas_consultar_propias", "eventos_consultar"
+            };
+            var coordTesoreriaExtras = new[]
+            {
+                "inicio",
+                "deudas_consultar_propias", "deudas_consultar_todos", "deudas_consultar_detalle",
+                "deudas_actividades_crear", "deudas_actividades_editar", "deudas_actividades_asignar",
+                "deudas_pagos_registrar", "deudas_pagos_revertir", "deudas_pagos_historial", "deudas_movimientos_bancarios",
+                "eventos_consultar", "eventos_crear", "eventos_editar", "eventos_cancelar"
+            };
+            var omegaExtras = new[]
+            {
+                "inicio", "deudas_consultar_propias", "eventos_consultar"
+            };
 
             foreach (var r in roles)
             {
@@ -78,6 +114,11 @@ public static class DbInitializer
                     if (r.Nombre == "Administrador") extras = adminExtras;
                     else if (r.Nombre == "Tesorero") extras = tesoreroExtras;
                     else if (r.Nombre == "Consulta") extras = consultaExtras;
+                    else if (r.Nombre.Equals("Coordinador de Tesorería", StringComparison.OrdinalIgnoreCase) ||
+                             r.Nombre.Equals("Coordinador de Tesoreria", StringComparison.OrdinalIgnoreCase))
+                        extras = coordTesoreriaExtras;
+                    else if (r.Nombre.Equals("Omega", StringComparison.OrdinalIgnoreCase))
+                        extras = omegaExtras;
                     else continue;
 
                     foreach (var mod in extras)
@@ -498,5 +539,81 @@ public static class DbInitializer
             await context.UsuarioRoles.AddRangeAsync(toAdd);
             await context.SaveChangesAsync();
         }
+    }
+
+    private static async Task EnsureSqliteDeudasEventosTablesAsync(AppDbContext context)
+    {
+        var statements = new[]
+        {
+            @"CREATE TABLE IF NOT EXISTS ActividadesDeuda (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Nombre TEXT NOT NULL,
+                Importe REAL NOT NULL,
+                FechaActividad TEXT NOT NULL,
+                Descripcion TEXT NULL,
+                Activa INTEGER NOT NULL DEFAULT 1,
+                CreadoPor TEXT NOT NULL,
+                FechaCreacion TEXT NOT NULL,
+                ModificadoPor TEXT NULL,
+                FechaModificacion TEXT NULL
+            );",
+            @"CREATE TABLE IF NOT EXISTS AsignacionesActividadDeuda (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ActividadDeudaId INTEGER NOT NULL REFERENCES ActividadesDeuda(Id) ON DELETE CASCADE,
+                UsuarioId INTEGER NOT NULL REFERENCES Users(Id) ON DELETE CASCADE,
+                Estado TEXT NOT NULL DEFAULT 'PENDIENTE',
+                FormaPago TEXT NULL,
+                CajaId INTEGER NULL REFERENCES Cajas(Id) ON DELETE SET NULL,
+                OperacionTesoreriaId INTEGER NULL REFERENCES Operaciones(Id) ON DELETE SET NULL,
+                FechaPago TEXT NULL,
+                RegistradoPagoPor TEXT NULL,
+                FechaAsignacion TEXT NOT NULL,
+                UltimaActualizacion TEXT NOT NULL,
+                ActualizadoPor TEXT NULL
+            );",
+            @"CREATE UNIQUE INDEX IF NOT EXISTS IX_AsignacionesActividadDeuda_ActividadDeudaId_UsuarioId ON AsignacionesActividadDeuda(ActividadDeudaId, UsuarioId);",
+            @"CREATE TABLE IF NOT EXISTS HistorialPagosDeuda (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                AsignacionActividadDeudaId INTEGER NOT NULL REFERENCES AsignacionesActividadDeuda(Id) ON DELETE CASCADE,
+                ActividadDeudaId INTEGER NOT NULL REFERENCES ActividadesDeuda(Id) ON DELETE CASCADE,
+                UsuarioId INTEGER NOT NULL REFERENCES Users(Id) ON DELETE CASCADE,
+                Importe REAL NOT NULL,
+                FormaPago TEXT NOT NULL,
+                CajaId INTEGER NOT NULL REFERENCES Cajas(Id) ON DELETE RESTRICT,
+                OperacionTesoreriaId INTEGER NOT NULL,
+                OperacionReversaId INTEGER NULL,
+                Estado TEXT NOT NULL DEFAULT 'CONFIRMADO',
+                FechaPago TEXT NOT NULL,
+                RegistradoPor TEXT NOT NULL,
+                FechaReversion TEXT NULL,
+                RevertidoPor TEXT NULL,
+                MotivoReversion TEXT NULL,
+                CajaNombre TEXT NOT NULL DEFAULT ''
+            );",
+            @"CREATE TABLE IF NOT EXISTS EventosOmega (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Nombre TEXT NOT NULL,
+                FechaHora TEXT NOT NULL,
+                Ubicacion TEXT NULL,
+                Descripcion TEXT NULL,
+                Estado TEXT NOT NULL DEFAULT 'ACTIVO',
+                CreadoPor TEXT NOT NULL,
+                FechaCreacion TEXT NOT NULL,
+                ModificadoPor TEXT NULL,
+                FechaModificacion TEXT NULL,
+                CanceladoPor TEXT NULL,
+                FechaCancelacion TEXT NULL,
+                MotivoCancelacion TEXT NULL
+            );"
+        };
+
+        try
+        {
+            foreach (var sql in statements)
+            {
+                await context.Database.ExecuteSqlRawAsync(sql);
+            }
+        }
+        catch { }
     }
 }

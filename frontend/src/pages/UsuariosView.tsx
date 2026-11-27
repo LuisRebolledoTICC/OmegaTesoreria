@@ -36,9 +36,37 @@ const GRUPOS_PERMISOS = [
     grupo: 'General',
     color: 'bg-slate-100 text-slate-700 border-slate-300',
     permisos: [
-      { id: 'dashboard', nombre: 'Dashboard General', descripcion: 'Panel general con balances y gráficos' },
+      { id: 'inicio', nombre: 'Inicio (Bienvenida Omega)', descripcion: 'Pantalla principal de bienvenida, estado de deuda personal y próximos eventos' },
+      { id: 'dashboard', nombre: 'Dashboard General (Tesorería)', descripcion: 'Panel general con balances y gráficos de tesorería' },
       { id: 'reportes', nombre: 'Reportes y Excel', descripcion: 'Auditorías y exportación de archivos Excel' },
       { id: 'usuarios', nombre: 'Usuarios y Permisos', descripcion: 'Gestión de usuarios y personalización de roles' },
+    ],
+  },
+  {
+    grupo: 'Deudas',
+    color: 'bg-rose-50 text-rose-800 border-rose-200',
+    permisos: [
+      { id: 'deudas_consultar_propias', nombre: 'Deudas: Consultar deudas propias', descripcion: 'Permite al usuario consultar únicamente sus propias deudas y actividades' },
+      { id: 'deudas_consultar_todos', nombre: 'Deudas: Consultar deudas de usuarios', descripcion: 'Permite ver la lista de usuarios de Omega con su deuda total' },
+      { id: 'deudas_consultar_detalle', nombre: 'Deudas: Consultar detalle de deudas', descripcion: 'Permite abrir el detalle de actividades y pagos de cada usuario' },
+      { id: 'deudas_actividades_crear', nombre: 'Deudas: Crear actividades', descripcion: 'Permite crear actividades generales asignadas a los usuarios de Omega (excepto Admin)' },
+      { id: 'deudas_actividades_editar', nombre: 'Deudas: Editar actividades', descripcion: 'Permite editar nombre, fecha y descripción de actividades creadas' },
+      { id: 'deudas_actividades_asignar', nombre: 'Deudas: Administrar asignaciones', descripcion: 'Permite asignar actividades a nuevos integrantes de Omega y cambiar estados de asistencia' },
+      { id: 'deudas_pagos_registrar', nombre: 'Deudas: Registrar pagos', descripcion: 'Permite registrar pagos en Efectivo o Transferencia seleccionando la caja compatible' },
+      { id: 'deudas_pagos_revertir', nombre: 'Deudas: Revertir pagos', descripcion: 'Permite revertir pagos registrados por error conservando trazabilidad bancaria' },
+      { id: 'deudas_pagos_historial', nombre: 'Deudas: Consultar historial de pagos', descripcion: 'Permite consultar el historial completo de pagos y reversiones' },
+      { id: 'deudas_movimientos_bancarios', nombre: 'Deudas: Consultar movimientos bancarios', descripcion: 'Permite consultar los movimientos bancarios generados por pagos de deudas' },
+    ],
+  },
+  {
+    grupo: 'Eventos',
+    color: 'bg-indigo-50 text-indigo-800 border-indigo-200',
+    permisos: [
+      { id: 'eventos_consultar', nombre: 'Eventos: Consultar eventos', descripcion: 'Permite consultar la lista de eventos y próximos eventos' },
+      { id: 'eventos_crear', nombre: 'Eventos: Crear eventos', descripcion: 'Permite crear nuevos eventos en Omega' },
+      { id: 'eventos_editar', nombre: 'Eventos: Editar eventos', descripcion: 'Permite modificar nombre, fecha, ubicación y descripción de eventos' },
+      { id: 'eventos_cancelar', nombre: 'Eventos: Cancelar eventos', descripcion: 'Permite cancelar eventos conservando su registro histórico' },
+      { id: 'eventos_eliminar', nombre: 'Eventos: Eliminar eventos', descripcion: 'Permite eliminar eventos futuros no históricos' },
     ],
   },
   {

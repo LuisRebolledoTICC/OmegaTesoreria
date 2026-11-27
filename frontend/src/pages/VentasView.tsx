@@ -86,6 +86,12 @@ export const VentasView: React.FC<VentasViewProps> = ({ cajas, onEntradaRealizad
   const [filtroEstado, setFiltroEstado] = useState<string>('TODOS');
   const [busquedaPedido, setBusquedaPedido] = useState<string>('');
 
+  // Cambio rápido de método de pago
+  const [openMetodoMenuPedidoId, setOpenMetodoMenuPedidoId] = useState<number | null>(null);
+  const [updatingPagoPedidoId, setUpdatingPagoPedidoId] = useState<number | null>(null);
+  const [pagoRapidoError, setPagoRapidoError] = useState<string | null>(null);
+  const canEditVentas = canAccessModule('ventas');
+
   const loadVentas = async () => {
     try {
       setLoading(true);
@@ -398,6 +404,61 @@ export const VentasView: React.FC<VentasViewProps> = ({ cajas, onEntradaRealizad
       loadVentaDetalle(selectedVentaId);
     } catch (err: any) {
       alert(err.message || 'No se pudo actualizar el estado.');
+    }
+  };
+
+  const handleChangeMetodoPagoRapido = async (
+    ped: Pedido,
+    nuevoMetodo: 'PENDIENTE' | 'EFECTIVO' | 'TRANSFERENCIA'
+  ) => {
+    if (!selectedVentaId || !ventaDetalle || ventaDetalle.estado === 'CERRADA' || ped.estadoEntrega === 'CANCELADO') return;
+    if (!canEditVentas) return;
+    if (updatingPagoPedidoId === ped.id) return;
+
+    setOpenMetodoMenuPedidoId(null);
+    setPagoRapidoError(null);
+
+    const snapshotPrevio = ventaDetalle;
+    setUpdatingPagoPedidoId(ped.id);
+
+    // Actualización optimista conservando pagos parciales si aplica
+    setVentaDetalle((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        pedidos: prev.pedidos.map((p) => {
+          if (p.id !== ped.id) return p;
+          if (p.estadoPago === 'PARCIAL') {
+            if (nuevoMetodo === 'PENDIENTE') return p;
+            const sumaActual = p.pagos.reduce((acc, x) => acc + x.importe, 0);
+            return {
+              ...p,
+              estadoPago: 'PARCIAL',
+              pagos: sumaActual > 0 ? [{ id: 0, pedidoId: p.id, metodoPago: nuevoMetodo, importe: sumaActual, fechaPago: new Date().toISOString() }] : p.pagos,
+            };
+          }
+          if (nuevoMetodo === 'PENDIENTE') {
+            return { ...p, estadoPago: 'PENDIENTE', pagos: [] };
+          }
+          return {
+            ...p,
+            estadoPago: p.totalPedido > 0 ? 'PAGADO' : 'PENDIENTE',
+            pagos: p.totalPedido > 0 ? [{ id: 0, pedidoId: p.id, metodoPago: nuevoMetodo, importe: p.totalPedido, fechaPago: new Date().toISOString() }] : [],
+          };
+        }),
+      };
+    });
+
+    try {
+      await api.updateMetodoPagoRapido(selectedVentaId, ped.id, nuevoMetodo);
+      await loadVentaDetalle(selectedVentaId);
+      loadVentas();
+    } catch (err: any) {
+      // Restaurar estado anterior si falla el guardado
+      setVentaDetalle(snapshotPrevio);
+      setPagoRapidoError(err.message || 'No se pudo actualizar el método de pago.');
+    } finally {
+      setUpdatingPagoPedidoId(null);
     }
   };
 
@@ -756,6 +817,16 @@ export const VentasView: React.FC<VentasViewProps> = ({ cajas, onEntradaRealizad
               </div>
             </div>
 
+            {pagoRapidoError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{pagoRapidoError}</span>
+                </div>
+                <button type="button" onClick={() => setPagoRapidoError(null)} className="text-rose-500 hover:text-rose-700 font-bold">✕</button>
+              </div>
+            )}
+
             {/* Vista Móvil en Tarjetas (< md) */}
             <div className="md:hidden p-3 space-y-3 bg-slate-50/60">
               {pedidosFiltrados.length === 0 ? (
@@ -801,25 +872,89 @@ export const VentasView: React.FC<VentasViewProps> = ({ cajas, onEntradaRealizad
 
                     {/* Pagos y Entrega */}
                     <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                      <div className="flex flex-wrap gap-1">
-                        {ped.pagos.length === 0 ? (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                            Pendiente de pago
-                          </span>
-                        ) : (
-                          ped.pagos.map((pg, i) => (
-                            <span
-                              key={i}
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                pg.metodoPago === 'EFECTIVO'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-blue-100 text-blue-800'
-                              }`}
-                            >
-                              {pg.metodoPago}: ${pg.importe.toFixed(2)}
-                            </span>
-                          ))
-                        )}
+                      <div className="relative flex flex-wrap gap-1 items-center">
+                        {(() => {
+                          const canQuickEditPago = canEditVentas && ventaDetalle.estado === 'ABIERTA' && ped.estadoEntrega !== 'CANCELADO';
+                          const isMenuOpen = openMetodoMenuPedidoId === ped.id;
+                          const isUpdating = updatingPagoPedidoId === ped.id;
+                          return (
+                            <>
+                              <button
+                                type="button"
+                                disabled={!canQuickEditPago || isUpdating}
+                                onClick={() => canQuickEditPago && setOpenMetodoMenuPedidoId(isMenuOpen ? null : ped.id)}
+                                title={canQuickEditPago ? 'Clic para cambiar método de pago' : 'Método de pago'}
+                                className={`flex flex-wrap items-center gap-1 rounded-lg px-1.5 py-1 transition ${
+                                  canQuickEditPago ? 'hover:bg-slate-100 cursor-pointer ring-1 ring-transparent hover:ring-slate-300' : 'cursor-default'
+                                } ${isUpdating ? 'opacity-60' : ''}`}
+                              >
+                                {ped.pagos.length === 0 ? (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                    Pendiente de pago
+                                  </span>
+                                ) : (
+                                  ped.pagos.map((pg, i) => (
+                                    <span
+                                      key={i}
+                                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                        pg.metodoPago === 'EFECTIVO'
+                                          ? 'bg-emerald-100 text-emerald-800'
+                                          : 'bg-blue-100 text-blue-800'
+                                      }`}
+                                    >
+                                      {pg.metodoPago}: ${pg.importe.toFixed(2)}
+                                    </span>
+                                  ))
+                                )}
+                                {ped.estadoPago === 'PARCIAL' && (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-100 text-orange-800 border border-orange-200">
+                                    PARCIAL
+                                  </span>
+                                )}
+                              </button>
+                              {isMenuOpen && canQuickEditPago && (
+                                <div className="absolute left-0 top-full mt-1 z-30 w-52 bg-white rounded-xl shadow-xl border border-slate-200 p-1.5 space-y-1">
+                                  <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                                    <span>Método de pago</span>
+                                    <button type="button" onClick={() => setOpenMetodoMenuPedidoId(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+                                  </div>
+                                  {ped.estadoPago !== 'PARCIAL' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleChangeMetodoPagoRapido(ped, 'PENDIENTE')}
+                                      className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-amber-800 hover:bg-amber-50 transition"
+                                    >
+                                      ⏳ Pendiente de pago
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleChangeMetodoPagoRapido(ped, 'EFECTIVO')}
+                                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-emerald-800 hover:bg-emerald-50 transition"
+                                  >
+                                    💵 Efectivo {ped.estadoPago === 'PARCIAL' ? '(mantiene parcial)' : ''}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleChangeMetodoPagoRapido(ped, 'TRANSFERENCIA')}
+                                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-blue-800 hover:bg-blue-50 transition"
+                                  >
+                                    🏦 Transferencia {ped.estadoPago === 'PARCIAL' ? '(mantiene parcial)' : ''}
+                                  </button>
+                                  {ped.estadoPago === 'PARCIAL' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => { setOpenMetodoMenuPedidoId(null); handleOpenEditarPedido(ped); }}
+                                      className="w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition border-t border-slate-100 mt-1"
+                                    >
+                                      ✏️ Editar pago parcial
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
 
                       {ped.estadoEntrega === 'CANCELADO' ? (
@@ -903,27 +1038,89 @@ export const VentasView: React.FC<VentasViewProps> = ({ cajas, onEntradaRealizad
                         <td className="p-3 font-bold text-slate-900 text-sm">
                           ${ped.totalPedido.toFixed(2)}
                         </td>
-                        <td className="p-3">
-                          <div className="space-y-0.5">
-                            {ped.pagos.length === 0 ? (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                Pendiente de pago
-                              </span>
-                            ) : (
-                              ped.pagos.map((pg, i) => (
-                                <span
-                                  key={i}
-                                  className={`inline-block mr-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                    pg.metodoPago === 'EFECTIVO'
-                                      ? 'bg-emerald-100 text-emerald-800'
-                                      : 'bg-blue-100 text-blue-800'
-                                  }`}
+                        <td className="p-3 relative">
+                          {(() => {
+                            const canQuickEditPago = canEditVentas && ventaDetalle.estado === 'ABIERTA' && ped.estadoEntrega !== 'CANCELADO';
+                            const isMenuOpen = openMetodoMenuPedidoId === ped.id;
+                            const isUpdating = updatingPagoPedidoId === ped.id;
+                            return (
+                              <div className="relative inline-block">
+                                <button
+                                  type="button"
+                                  disabled={!canQuickEditPago || isUpdating}
+                                  onClick={() => canQuickEditPago && setOpenMetodoMenuPedidoId(isMenuOpen ? null : ped.id)}
+                                  title={canQuickEditPago ? 'Clic para cambiar método de pago' : 'Método de pago'}
+                                  className={`text-left rounded-lg px-1.5 py-1 transition flex flex-wrap items-center gap-1 ${
+                                    canQuickEditPago ? 'hover:bg-slate-100 cursor-pointer ring-1 ring-transparent hover:ring-slate-300' : 'cursor-default'
+                                  } ${isUpdating ? 'opacity-60' : ''}`}
                                 >
-                                  {pg.metodoPago}: ${pg.importe.toFixed(2)}
-                                </span>
-                              ))
-                            )}
-                          </div>
+                                  {ped.pagos.length === 0 ? (
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                      Pendiente de pago
+                                    </span>
+                                  ) : (
+                                    ped.pagos.map((pg, i) => (
+                                      <span
+                                        key={i}
+                                        className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                          pg.metodoPago === 'EFECTIVO'
+                                            ? 'bg-emerald-100 text-emerald-800'
+                                            : 'bg-blue-100 text-blue-800'
+                                        }`}
+                                      >
+                                        {pg.metodoPago}: ${pg.importe.toFixed(2)}
+                                      </span>
+                                    ))
+                                  )}
+                                  {ped.estadoPago === 'PARCIAL' && (
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-100 text-orange-800 border border-orange-200">
+                                      PARCIAL
+                                    </span>
+                                  )}
+                                </button>
+                                {isMenuOpen && canQuickEditPago && (
+                                  <div className="absolute left-0 top-full mt-1 z-30 w-52 bg-white rounded-xl shadow-xl border border-slate-200 p-1.5 space-y-1">
+                                    <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                                      <span>Método de pago</span>
+                                      <button type="button" onClick={() => setOpenMetodoMenuPedidoId(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+                                    </div>
+                                    {ped.estadoPago !== 'PARCIAL' && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleChangeMetodoPagoRapido(ped, 'PENDIENTE')}
+                                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-amber-800 hover:bg-amber-50 transition"
+                                      >
+                                        ⏳ Pendiente de pago
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleChangeMetodoPagoRapido(ped, 'EFECTIVO')}
+                                      className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-emerald-800 hover:bg-emerald-50 transition"
+                                    >
+                                      💵 Efectivo {ped.estadoPago === 'PARCIAL' ? '(mantiene parcial)' : ''}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleChangeMetodoPagoRapido(ped, 'TRANSFERENCIA')}
+                                      className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-blue-800 hover:bg-blue-50 transition"
+                                    >
+                                      🏦 Transferencia {ped.estadoPago === 'PARCIAL' ? '(mantiene parcial)' : ''}
+                                    </button>
+                                    {ped.estadoPago === 'PARCIAL' && (
+                                      <button
+                                        type="button"
+                                        onClick={() => { setOpenMetodoMenuPedidoId(null); handleOpenEditarPedido(ped); }}
+                                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition border-t border-slate-100 mt-1"
+                                      >
+                                        ✏️ Editar pago parcial
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="p-3 text-center">
                           {ped.estadoEntrega === 'CANCELADO' ? (

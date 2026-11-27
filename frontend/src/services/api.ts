@@ -26,7 +26,13 @@ import {
   PresupuestoAreaResumen,
   PresupuestoAreaDetalle,
   MovimientoPresupuesto,
-  PresupuestoEvidenciaInput
+  PresupuestoEvidenciaInput,
+  ActividadDeuda,
+  AsignacionDeuda,
+  UsuarioDeudaDetalle,
+  DeudasResumenGlobal,
+  HistorialPagoDeuda,
+  EventoOmega
 } from '../types';
 
 // Detect host for LAN, Localhost and Embedded mode
@@ -532,6 +538,15 @@ export const api = {
     await handleResponse(res);
   },
 
+  async updateMetodoPagoRapido(ventaId: number, pedidoId: number, metodoPago: 'PENDIENTE' | 'EFECTIVO' | 'TRANSFERENCIA'): Promise<Pedido> {
+    const res = await fetch(`${API_BASE_URL}/ventas/${ventaId}/pedidos/${pedidoId}/metodo-pago`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ metodoPago }),
+    });
+    return handleResponse<Pedido>(res);
+  },
+
   async cancelarPedido(ventaId: number, pedidoId: number): Promise<void> {
     const res = await fetch(`${API_BASE_URL}/ventas/${ventaId}/pedidos/${pedidoId}/cancelar`, {
       method: 'POST',
@@ -864,5 +879,166 @@ export const api = {
       body: JSON.stringify(data),
     });
     return handleResponse<MovimientoPresupuesto>(res);
+  },
+
+  // ─── Módulo Deudas ──────────────────────────────────────────────────────────
+  async getMisDeudas(): Promise<UsuarioDeudaDetalle> {
+    const res = await fetch(`${API_BASE_URL}/deudas/mis-deudas`, { headers: getHeaders() });
+    return handleResponse<UsuarioDeudaDetalle>(res);
+  },
+
+  async getDeudasResumenGlobal(): Promise<DeudasResumenGlobal> {
+    const res = await fetch(`${API_BASE_URL}/deudas/usuarios`, { headers: getHeaders() });
+    return handleResponse<DeudasResumenGlobal>(res);
+  },
+
+  async getDeudaDetalleUsuario(usuarioId: number): Promise<UsuarioDeudaDetalle> {
+    const res = await fetch(`${API_BASE_URL}/deudas/usuarios/${usuarioId}`, { headers: getHeaders() });
+    return handleResponse<UsuarioDeudaDetalle>(res);
+  },
+
+  async getActividadesDeuda(): Promise<ActividadDeuda[]> {
+    const res = await fetch(`${API_BASE_URL}/deudas/actividades`, { headers: getHeaders() });
+    return handleResponse<ActividadDeuda[]>(res);
+  },
+
+  async createActividadDeuda(data: {
+    nombre: string;
+    importe: number;
+    fechaActividad: string;
+    descripcion?: string;
+  }): Promise<ActividadDeuda> {
+    const res = await fetch(`${API_BASE_URL}/deudas/actividades`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<ActividadDeuda>(res);
+  },
+
+  async updateActividadDeuda(id: number, data: {
+    nombre: string;
+    importe: number;
+    fechaActividad: string;
+    descripcion?: string;
+  }): Promise<ActividadDeuda> {
+    const res = await fetch(`${API_BASE_URL}/deudas/actividades/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<ActividadDeuda>(res);
+  },
+
+  async asignarFaltantesActividad(id: number): Promise<{ asignados: number; message: string }> {
+    const res = await fetch(`${API_BASE_URL}/deudas/actividades/${id}/asignar-faltantes`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    return handleResponse<{ asignados: number; message: string }>(res);
+  },
+
+  async registrarPagoDeuda(asignacionId: number, data: {
+    formaPago: 'EFECTIVO' | 'TRANSFERENCIA';
+    cajaId: number;
+    fechaPago?: string;
+  }): Promise<AsignacionDeuda> {
+    const res = await fetch(`${API_BASE_URL}/deudas/asignaciones/${asignacionId}/pagar`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<AsignacionDeuda>(res);
+  },
+
+  async cambiarEstadoDeuda(asignacionId: number, data: {
+    nuevoEstado: 'PENDIENTE' | 'NO_ASISTIO';
+    motivo?: string;
+  }): Promise<AsignacionDeuda> {
+    const res = await fetch(`${API_BASE_URL}/deudas/asignaciones/${asignacionId}/estado`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<AsignacionDeuda>(res);
+  },
+
+  async revertirPagoDeuda(asignacionId: number, motivo: string): Promise<AsignacionDeuda> {
+    const res = await fetch(`${API_BASE_URL}/deudas/asignaciones/${asignacionId}/revertir-pago`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ motivo }),
+    });
+    return handleResponse<AsignacionDeuda>(res);
+  },
+
+  async getHistorialPagosDeuda(usuarioId?: number, actividadId?: number): Promise<HistorialPagoDeuda[]> {
+    const params = new URLSearchParams();
+    if (usuarioId) params.append('usuarioId', String(usuarioId));
+    if (actividadId) params.append('actividadId', String(actividadId));
+    const q = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`${API_BASE_URL}/deudas/pagos/historial${q}`, { headers: getHeaders() });
+    return handleResponse<HistorialPagoDeuda[]>(res);
+  },
+
+  async getMovimientosBancariosDeudas(): Promise<Operacion[]> {
+    const res = await fetch(`${API_BASE_URL}/deudas/movimientos-bancarios`, { headers: getHeaders() });
+    return handleResponse<Operacion[]>(res);
+  },
+
+  // ─── Módulo Eventos ─────────────────────────────────────────────────────────
+  async getEventos(): Promise<EventoOmega[]> {
+    const res = await fetch(`${API_BASE_URL}/eventos`, { headers: getHeaders() });
+    return handleResponse<EventoOmega[]>(res);
+  },
+
+  async getProximosEventos(): Promise<EventoOmega[]> {
+    const res = await fetch(`${API_BASE_URL}/eventos/proximos`, { headers: getHeaders() });
+    return handleResponse<EventoOmega[]>(res);
+  },
+
+  async createEvento(data: {
+    nombre: string;
+    fechaHora: string;
+    ubicacion?: string;
+    descripcion?: string;
+  }): Promise<EventoOmega> {
+    const res = await fetch(`${API_BASE_URL}/eventos`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<EventoOmega>(res);
+  },
+
+  async updateEvento(id: number, data: {
+    nombre: string;
+    fechaHora: string;
+    ubicacion?: string;
+    descripcion?: string;
+  }): Promise<EventoOmega> {
+    const res = await fetch(`${API_BASE_URL}/eventos/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<EventoOmega>(res);
+  },
+
+  async cancelarEvento(id: number, motivo?: string): Promise<EventoOmega> {
+    const res = await fetch(`${API_BASE_URL}/eventos/${id}/cancelar`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ motivo }),
+    });
+    return handleResponse<EventoOmega>(res);
+  },
+
+  async deleteEvento(id: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/eventos/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    await handleResponse(res);
   }
 };

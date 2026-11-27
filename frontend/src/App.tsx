@@ -3,7 +3,10 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { Sidebar, ActiveTab } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
 import { LoginView } from './pages/LoginView';
+import { InicioView } from './pages/InicioView';
 import { DashboardView } from './pages/DashboardView';
+import { DeudasView } from './pages/DeudasView';
+import { EventosView } from './pages/EventosView';
 import { CajasView } from './pages/CajasView';
 import { ConteoEfectivoView } from './pages/ConteoEfectivoView';
 import { OperacionesView } from './pages/OperacionesView';
@@ -19,7 +22,10 @@ import { api } from './services/api';
 import { Lock } from 'lucide-react';
 
 const ORDERED_TABS: ActiveTab[] = [
+  'inicio',
   'dashboard',
+  'deudas',
+  'eventos',
   'ventas',
   'cajas',
   'conteo',
@@ -38,6 +44,10 @@ const MainLayout: React.FC = () => {
       ? canAccessModule('inventarios') || canAccessModule('inventarios_ver_todos')
       : tab === 'presupuestos'
       ? canAccessModule('presupuestos') || canAccessModule('presupuestos_ver_todos') || canAccessModule('presupuestos_administrar') || canAccessModule('presupuestos_consultar_mi_area') || canAccessModule('presupuestos_consultar_todos')
+      : tab === 'deudas'
+      ? canAccessModule('deudas_consultar_propias') || canAccessModule('deudas_consultar_todos') || canAccessModule('deudas_consultar_detalle') || canAccessModule('deudas_actividades_crear') || canAccessModule('deudas_actividades_editar') || canAccessModule('deudas_actividades_asignar') || canAccessModule('deudas_pagos_registrar') || canAccessModule('deudas_pagos_revertir') || canAccessModule('deudas_pagos_historial') || canAccessModule('deudas_movimientos_bancarios')
+      : tab === 'eventos'
+      ? canAccessModule('eventos_consultar') || canAccessModule('eventos_crear') || canAccessModule('eventos_editar') || canAccessModule('eventos_cancelar') || canAccessModule('eventos_eliminar')
       : canAccessModule(tab);
   const availableTabs = ORDERED_TABS.filter((t) => canAccessTab(t));
   const firstAvailableTab = availableTabs[0] || null;
@@ -117,7 +127,10 @@ const MainLayout: React.FC = () => {
   };
 
   const titles: Record<ActiveTab, string> = {
+    inicio: 'Inicio de Grupo Omega',
     dashboard: 'Panel General de Tesorería',
+    deudas: 'Módulo de Deudas y Actividades',
+    eventos: 'Eventos de Omega',
     ventas: 'Ventas y Pedidos',
     cajas: 'Administración de Cajas',
     conteo: 'Conteo Físico de Efectivo',
@@ -156,6 +169,14 @@ const MainLayout: React.FC = () => {
         />
 
         <main className="flex-1 p-3 sm:p-5 md:p-6 overflow-y-auto w-full max-w-7xl mx-auto print:p-0 print:overflow-visible print:max-w-none">
+          {currentTab === 'inicio' && canAccessTab('inicio') && (
+            <InicioView
+              setActiveTab={(tab) => {
+                if (canAccessTab(tab)) setActiveTab(tab);
+              }}
+            />
+          )}
+
           {currentTab === 'dashboard' && canAccessModule('dashboard') && (
             <DashboardView
               summary={summary}
@@ -172,6 +193,17 @@ const MainLayout: React.FC = () => {
               cajas={cajas}
               onEntradaRealizada={loadData}
             />
+          )}
+
+          {currentTab === 'deudas' && canAccessTab('deudas') && (
+            <DeudasView
+              cajas={cajas}
+              onBalanceChanged={loadData}
+            />
+          )}
+
+          {currentTab === 'eventos' && canAccessTab('eventos') && (
+            <EventosView />
           )}
 
           {currentTab === 'cajas' && canAccessModule('cajas') && (

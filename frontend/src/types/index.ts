@@ -432,3 +432,102 @@ export interface PresupuestoAreaDetalle {
   resumen: PresupuestoAreaResumen;
   movimientos: MovimientoPresupuesto[];
 }
+
+// ─── Módulo Deudas y Eventos ──────────────────────────────────────────────────
+
+export interface ActividadDeuda {
+  id: number;
+  nombre: string;
+  importe: number;
+  fechaActividad: string;
+  descripcion?: string | null;
+  activa: boolean;
+  creadoPor: string;
+  fechaCreacion: string;
+  totalAsignados: number;
+  totalPendientes: number;
+  totalPagados: number;
+  totalNoAsistio: number;
+  totalRecaudado: number;
+  totalPorCobrar: number;
+}
+
+export interface UsuarioDeudaResumen {
+  usuarioId: number;
+  userName: string;
+  nombre: string;
+  rol: string;
+  deudaTotal: number;
+  totalPagado: number;
+  actividadesPendientes: number;
+  actividadesPagadas: number;
+  actividadesNoAsistio: number;
+  totalActividades: number;
+}
+
+export interface AsignacionDeuda {
+  id: number;
+  actividadDeudaId: number;
+  actividadNombre: string;
+  fechaActividad: string;
+  actividadDescripcion?: string | null;
+  importeOriginal: number;
+  usuarioId: number;
+  usuarioNombre: string;
+  estado: 'PENDIENTE' | 'PAGADO' | 'NO_ASISTIO';
+  deudaCorrespondiente: number;
+  formaPago?: 'EFECTIVO' | 'TRANSFERENCIA' | null;
+  cajaId?: number | null;
+  cajaNombre?: string | null;
+  operacionTesoreriaId?: number | null;
+  fechaPago?: string | null;
+  registradoPagoPor?: string | null;
+  fechaAsignacion: string;
+}
+
+export interface UsuarioDeudaDetalle {
+  resumen: UsuarioDeudaResumen;
+  actividades: AsignacionDeuda[];
+}
+
+export interface DeudasResumenGlobal {
+  totalDeudaPendiente: number;
+  totalRecaudado: number;
+  usuariosConDeuda: number;
+  usuarios: UsuarioDeudaResumen[];
+}
+
+export interface HistorialPagoDeuda {
+  id: number;
+  asignacionActividadDeudaId: number;
+  actividadDeudaId: number;
+  actividadNombre: string;
+  usuarioId: number;
+  usuarioNombre: string;
+  importe: number;
+  formaPago: 'EFECTIVO' | 'TRANSFERENCIA';
+  cajaId: number;
+  cajaNombre: string;
+  operacionTesoreriaId: number;
+  operacionReversaId?: number | null;
+  estado: 'CONFIRMADO' | 'REVERTIDO';
+  fechaPago: string;
+  registradoPor: string;
+  fechaReversion?: string | null;
+  revertidoPor?: string | null;
+  motivoReversion?: string | null;
+}
+
+export interface EventoOmega {
+  id: number;
+  nombre: string;
+  fechaHora: string;
+  ubicacion?: string | null;
+  descripcion?: string | null;
+  estado: 'ACTIVO' | 'CANCELADO';
+  creadoPor: string;
+  fechaCreacion: string;
+  canceladoPor?: string | null;
+  fechaCancelacion?: string | null;
+  motivoCancelacion?: string | null;
+}

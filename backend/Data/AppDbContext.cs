@@ -43,6 +43,12 @@ public class AppDbContext : DbContext, IDataProtectionKeyContext
     public DbSet<PresupuestoEvidencia> PresupuestoEvidencias => Set<PresupuestoEvidencia>();
     public DbSet<PresupuestoMovimientoHistorial> PresupuestoMovimientosHistorial => Set<PresupuestoMovimientoHistorial>();
 
+    // Módulo Deudas y Eventos
+    public DbSet<ActividadDeuda> ActividadesDeuda => Set<ActividadDeuda>();
+    public DbSet<AsignacionActividadDeuda> AsignacionesActividadDeuda => Set<AsignacionActividadDeuda>();
+    public DbSet<HistorialPagoDeuda> HistorialPagosDeuda => Set<HistorialPagoDeuda>();
+    public DbSet<EventoOmega> EventosOmega => Set<EventoOmega>();
+
     // Persistencia de claves criptográficas de ASP.NET Core Data Protection
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -88,6 +94,10 @@ public class AppDbContext : DbContext, IDataProtectionKeyContext
             modelBuilder.Entity<PresupuestoArea>().Property(p => p.TotalDevuelto).HasConversion<double>();
             modelBuilder.Entity<PresupuestoArea>().Property(p => p.TotalAjustes).HasConversion<double>();
             modelBuilder.Entity<MovimientoPresupuesto>().Property(m => m.Importe).HasConversion<double>();
+
+            // Deudas en SQLite
+            modelBuilder.Entity<ActividadDeuda>().Property(a => a.Importe).HasConversion<double>();
+            modelBuilder.Entity<HistorialPagoDeuda>().Property(h => h.Importe).HasConversion<double>();
         }
         else
         {
@@ -125,6 +135,10 @@ public class AppDbContext : DbContext, IDataProtectionKeyContext
             modelBuilder.Entity<PresupuestoArea>().Property(p => p.TotalDevuelto).HasPrecision(18, 2);
             modelBuilder.Entity<PresupuestoArea>().Property(p => p.TotalAjustes).HasPrecision(18, 2);
             modelBuilder.Entity<MovimientoPresupuesto>().Property(m => m.Importe).HasPrecision(18, 2);
+
+            // Deudas en PostgreSQL
+            modelBuilder.Entity<ActividadDeuda>().Property(a => a.Importe).HasPrecision(18, 2);
+            modelBuilder.Entity<HistorialPagoDeuda>().Property(h => h.Importe).HasPrecision(18, 2);
         }
 
         // Relaciones
@@ -328,5 +342,62 @@ public class AppDbContext : DbContext, IDataProtectionKeyContext
         modelBuilder.Entity<MovimientoPresupuesto>().HasIndex(m => m.FechaMovimiento);
         modelBuilder.Entity<MovimientoPresupuesto>().HasIndex(m => m.TipoMovimiento);
         modelBuilder.Entity<MovimientoPresupuesto>().HasIndex(m => m.Estado);
+
+        // ========== Relaciones Deudas y Eventos ==========
+        modelBuilder.Entity<ActividadDeuda>()
+            .HasMany(a => a.Asignaciones)
+            .WithOne(asig => asig.ActividadDeuda)
+            .HasForeignKey(asig => asig.ActividadDeudaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<AsignacionActividadDeuda>()
+            .HasOne(asig => asig.Usuario)
+            .WithMany()
+            .HasForeignKey(asig => asig.UsuarioId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<AsignacionActividadDeuda>()
+            .HasOne(asig => asig.Caja)
+            .WithMany()
+            .HasForeignKey(asig => asig.CajaId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<AsignacionActividadDeuda>()
+            .HasOne(asig => asig.OperacionTesoreria)
+            .WithMany()
+            .HasForeignKey(asig => asig.OperacionTesoreriaId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Índice único: un usuario solo tiene un registro por actividad
+        modelBuilder.Entity<AsignacionActividadDeuda>()
+            .HasIndex(asig => new { asig.ActividadDeudaId, asig.UsuarioId })
+            .IsUnique();
+
+        modelBuilder.Entity<AsignacionActividadDeuda>()
+            .HasMany(asig => asig.HistorialPagos)
+            .WithOne(h => h.Asignacion)
+            .HasForeignKey(h => h.AsignacionActividadDeudaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<HistorialPagoDeuda>()
+            .HasOne(h => h.ActividadDeuda)
+            .WithMany()
+            .HasForeignKey(h => h.ActividadDeudaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<HistorialPagoDeuda>()
+            .HasOne(h => h.Usuario)
+            .WithMany()
+            .HasForeignKey(h => h.UsuarioId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<HistorialPagoDeuda>()
+            .HasOne(h => h.Caja)
+            .WithMany()
+            .HasForeignKey(h => h.CajaId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<EventoOmega>().HasIndex(e => e.FechaHora);
+        modelBuilder.Entity<EventoOmega>().HasIndex(e => e.Estado);
     }
 }

@@ -240,7 +240,7 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
           </p>
         </div>
 
-        {canOperate && (
+        {(canOperate || canAccessModule('operaciones') || canAccessModule('entradas') || canAsignarPresupuesto) && (
           <div className="flex flex-wrap items-center gap-2">
             {canAccessModule('entradas') && (
               <button
@@ -251,20 +251,24 @@ export const OperacionesView: React.FC<OperacionesViewProps> = ({ cajas, onOpera
                 <span>Nueva Entrada</span>
               </button>
             )}
-            <button
-              onClick={() => openModal('salida')}
-              className="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs flex items-center space-x-1.5 transition shadow-xs"
-            >
-              <ArrowUpRight className="w-4 h-4" />
-              <span>Nueva Salida</span>
-            </button>
-            <button
-              onClick={() => openModal('transferencia')}
-              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs flex items-center space-x-1.5 transition shadow-xs"
-            >
-              <ArrowLeftRight className="w-4 h-4" />
-              <span>Transferencia</span>
-            </button>
+            {(canOperate || canAccessModule('operaciones')) && (
+              <>
+                <button
+                  onClick={() => openModal('salida')}
+                  className="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs flex items-center space-x-1.5 transition shadow-xs"
+                >
+                  <ArrowUpRight className="w-4 h-4" />
+                  <span>Nueva Salida</span>
+                </button>
+                <button
+                  onClick={() => openModal('transferencia')}
+                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs flex items-center space-x-1.5 transition shadow-xs"
+                >
+                  <ArrowLeftRight className="w-4 h-4" />
+                  <span>Transferencia</span>
+                </button>
+              </>
+            )}
             {canAsignarPresupuesto && (
               <button
                 onClick={() => openModal('presupuesto')}

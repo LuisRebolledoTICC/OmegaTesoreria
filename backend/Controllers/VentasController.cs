@@ -150,9 +150,29 @@ public class VentasController : ControllerBase
     {
         try
         {
+            if (!await _authService.HasPermissionAsync(GetCurrentUserName(), "ventas"))
+                return StatusCode(403, new { message = "No tienes permiso para modificar pedidos en Ventas." });
+
             var success = await _ventasService.UpdateEstadoEntregaAsync(id, pedidoId, request, GetCurrentUserName());
             if (!success) return BadRequest(new { message = "No se pudo actualizar el estado del pedido." });
             return Ok(new { message = "Estado de entrega actualizado." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPatch("{id}/pedidos/{pedidoId}/metodo-pago")]
+    public async Task<IActionResult> UpdateMetodoPagoRapido(int id, int pedidoId, [FromBody] UpdateMetodoPagoRapidoRequest request)
+    {
+        try
+        {
+            if (!await _authService.HasPermissionAsync(GetCurrentUserName(), "ventas"))
+                return StatusCode(403, new { message = "No tienes permiso para modificar el método de pago en Ventas." });
+
+            var updated = await _ventasService.UpdateMetodoPagoRapidoAsync(id, pedidoId, request, GetCurrentUserName());
+            return Ok(updated);
         }
         catch (Exception ex)
         {

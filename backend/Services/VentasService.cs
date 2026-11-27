@@ -22,6 +22,7 @@ public interface IVentasService
     Task<PedidoDto> CreatePedidoAsync(int ventaId, CreatePedidoRequest request, string userName);
     Task<PedidoDto> UpdatePedidoAsync(int ventaId, int pedidoId, CreatePedidoRequest request, string userName);
     Task<bool> UpdateEstadoEntregaAsync(int ventaId, int pedidoId, UpdateEstadoEntregaRequest request, string userName);
+    Task<PedidoDto> UpdateMetodoPagoRapidoAsync(int ventaId, int pedidoId, UpdateMetodoPagoRapidoRequest request, string userName);
     Task<bool> CancelarPedidoAsync(int ventaId, int pedidoId, string userName);
 
     // Cierre e integración con Tesorería: "Realizar Entrada"
@@ -540,6 +541,107 @@ public class VentasService : IVentasService
         pedido.EstadoEntrega = request.EstadoEntrega.ToUpperInvariant();
         await _context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<PedidoDto> UpdateMetodoPagoRapidoAsync(int ventaId, int pedidoId, UpdateMetodoPagoRapidoRequest request, string userName)
+    {
+        var venta = await _context.Ventas.FindAsync(ventaId)
+            ?? throw new InvalidOperationException("Venta no encontrada.");
+        if (venta.Estado == "CERRADA")
+            throw new InvalidOperationException("No se puede modificar el método de pago en una venta cerrada.");
+
+        var pedido = await _context.Pedidos
+            .Include(p => p.Detalles)
+            .Include(p => p.Pagos)
+            .FirstOrDefaultAsync(p => p.Id == pedidoId && p.VentaId == ventaId)
+            ?? throw new InvalidOperationException("Pedido no encontrado.");
+
+        if (pedido.EstadoEntrega == "CANCELADO")
+            throw new InvalidOperationException("No se puede modificar el método de pago de un pedido cancelado.");
+
+        var metodo = (request.MetodoPago ?? "").Trim().ToUpperInvariant();
+        if (metodo != "PENDIENTE" && metodo != "EFECTIVO" && metodo != "TRANSFERENCIA")
+            throw new InvalidOperationException("El método de pago únicamente puede ser PENDIENTE, EFECTIVO o TRANSFERENCIA.");
+
+        if (pedido.EstadoPago == "PARCIAL")
+        {
+            if (metodo == "PENDIENTE")
+            {
+                throw new InvalidOperationException("Este pedido tiene un pago parcial registrado. Usa el formulario de edición para modificar los importes.");
+            }
+
+            // Conservar exactamente los importes parciales sin convertir el pedido en pago completo
+            decimal totalPagadoActual = pedido.Pagos.Sum(pg => pg.Importe);
+            if (totalPagadoActual > 0)
+            {
+                _context.PedidoPagos.RemoveRange(pedido.Pagos);
+                pedido.Pagos.Clear();
+                pedido.Pagos.Add(new PedidoPago
+                {
+                    PedidoId = pedido.Id,
+                    MetodoPago = metodo,
+                    Importe = totalPagadoActual,
+                    Referencia = "Cambio rápido conservando pago parcial",
+                    FechaPago = DateTime.UtcNow
+                });
+            }
+            pedido.EstadoPago = "PARCIAL";
+        }
+        else
+        {
+            _context.PedidoPagos.RemoveRange(pedido.Pagos);
+            pedido.Pagos.Clear();
+
+            if (metodo == "PENDIENTE")
+            {
+                pedido.EstadoPago = "PENDIENTE";
+            }
+            else
+            {
+                if (pedido.TotalPedido > 0)
+                {
+                    pedido.Pagos.Add(new PedidoPago
+                    {
+                        PedidoId = pedido.Id,
+                        MetodoPago = metodo,
+                        Importe = pedido.TotalPedido,
+                        FechaPago = DateTime.UtcNow
+                    });
+                    pedido.EstadoPago = "PAGADO";
+                }
+                else
+                {
+                    pedido.EstadoPago = "PENDIENTE";
+                }
+            }
+        }
+
+        _context.Auditoria.Add(new Auditoria
+        {
+            UsuarioNombre = userName,
+            Accion = "CAMBIO_RAPIDO_METODO_PAGO",
+            Entidad = "Pedido",
+            EntidadId = pedido.Folio.ToString(),
+            FechaHora = DateTime.UtcNow,
+            Descripcion = $"Cambio rápido de método de pago del pedido #{pedido.Folio} (Venta '{venta.Nombre}') a {metodo} (EstadoPago: {pedido.EstadoPago})."
+        });
+
+        await _context.SaveChangesAsync();
+
+        return new PedidoDto(
+            pedido.Id,
+            pedido.VentaId,
+            pedido.Folio,
+            pedido.NombreCliente,
+            pedido.FechaHora,
+            pedido.TotalPedido,
+            pedido.EstadoEntrega,
+            pedido.EstadoPago,
+            pedido.Observaciones,
+            pedido.RegistradoPor,
+            pedido.Detalles.Select(d => new PedidoDetalleDto(d.Id, d.PedidoId, d.VentaPresentacionId, d.ProductoNombre, d.PresentacionNombre, d.Cantidad, d.PrecioUnitario, d.Subtotal)).ToList(),
+            pedido.Pagos.Select(pg => new PedidoPagoDto(pg.Id, pg.PedidoId, pg.MetodoPago, pg.Importe, pg.Referencia, pg.FechaPago)).ToList()
+        );
     }
 
     public async Task<bool> CancelarPedidoAsync(int ventaId, int pedidoId, string userName)

@@ -38,7 +38,7 @@ public record CajaEfectivoItemDto(
 );
 
 public record CreateCajaRequest(string Nombre, string Descripcion, string Finalidad, decimal SaldoInicial, string? Tipo = "EFECTIVO");
-public record UpdateCajaRequest(string Nombre, string Descripcion, string Finalidad, bool Activa, string? Tipo = "EFECTIVO");
+public record UpdateCajaRequest(string Nombre, string? Descripcion = null);
 
 public class ConteoItemDto
 {

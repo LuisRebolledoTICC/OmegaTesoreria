@@ -191,13 +191,13 @@ export const api = {
     return handleResponse<Caja>(res);
   },
 
-  async updateCaja(id: number, data: { nombre: string; descripcion: string; finalidad: string; activa: boolean; tipo?: string }): Promise<void> {
+  async updateCaja(id: number, data: { nombre: string; descripcion?: string }): Promise<{ message: string }> {
     const res = await fetch(`${API_BASE_URL}/cajas/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(data),
     });
-    await handleResponse(res);
+    return handleResponse<{ message: string }>(res);
   },
 
   async toggleCajaStatus(id: number): Promise<void> {

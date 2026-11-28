@@ -15,7 +15,9 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   ArrowLeftRight,
-  Check
+  Check,
+  Pencil,
+  CheckCircle2
 } from 'lucide-react';
 import { Caja } from '../types';
 import { api } from '../services/api';
@@ -41,6 +43,14 @@ export const CajasView: React.FC<CajasViewProps> = ({ cajas, onRefresh, onNaviga
   const [saldoInicial, setSaldoInicial] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Form states - Editar caja (solo Nombre y Descripción)
+  const [editingCaja, setEditingCaja] = useState<Caja | null>(null);
+  const [editNombre, setEditNombre] = useState('');
+  const [editDescripcion, setEditDescripcion] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // Form states - Movimiento Rápido (Entrada / Salida bancaria o de efectivo)
   const [showQuickOpModal, setShowQuickOpModal] = useState(false);
@@ -83,6 +93,40 @@ export const CajasView: React.FC<CajasViewProps> = ({ cajas, onRefresh, onNaviga
       setError(err.message || 'Error al crear la caja.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleOpenEditCaja = (caja: Caja) => {
+    setEditingCaja(caja);
+    setEditNombre(caja.nombre);
+    setEditDescripcion(caja.descripcion || '');
+    setEditError(null);
+  };
+
+  const handleSaveEditCaja = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCaja) return;
+
+    const nombreTrimmed = editNombre.trim();
+    if (!nombreTrimmed) {
+      setEditError('El nombre de la caja es obligatorio.');
+      return;
+    }
+
+    setSavingEdit(true);
+    setEditError(null);
+    try {
+      await api.updateCaja(editingCaja.id, {
+        nombre: nombreTrimmed,
+        descripcion: editDescripcion.trim(),
+      });
+      setSuccessMessage(`Los detalles de la caja "${nombreTrimmed}" se actualizaron correctamente.`);
+      setEditingCaja(null);
+      onRefresh();
+    } catch (err: any) {
+      setEditError(err.message || 'No se pudieron guardar los cambios de la caja.');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -218,6 +262,22 @@ export const CajasView: React.FC<CajasViewProps> = ({ cajas, onRefresh, onNaviga
         </div>
       </div>
 
+      {successMessage && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center justify-between gap-2">
+          <div className="flex items-center space-x-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+            <span className="font-medium">{successMessage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSuccessMessage(null)}
+            className="font-bold text-emerald-700 hover:text-emerald-900"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Cajas Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {filteredCajas.map((caja) => {
@@ -349,6 +409,14 @@ export const CajasView: React.FC<CajasViewProps> = ({ cajas, onRefresh, onNaviga
 
                   {isAdmin && (
                     <>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditCaja(caja)}
+                        title="Editar nombre y descripción de la caja"
+                        className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded transition"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => handleToggleStatus(caja)}
                         title={caja.activa ? 'Desactivar caja' : 'Reactivar caja'}
@@ -743,6 +811,85 @@ export const CajasView: React.FC<CajasViewProps> = ({ cajas, onRefresh, onNaviga
                       ? 'Guardando...'
                       : `Registrar ${quickOpType === 'ENTRADA' ? 'Entrada' : 'Salida'}`}
                   </span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Editar Caja (solo Nombre y Descripción) */}
+      {editingCaja && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-200 max-h-[90dvh] flex flex-col">
+            <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-lg flex items-center space-x-2">
+                  <Pencil className="w-4 h-4 text-amber-400" />
+                  <span>Editar Caja</span>
+                </h3>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  ID #{editingCaja.id} · {editingCaja.tipo === 'TRANSFERENCIAS' ? 'Transferencias / Banco' : 'Efectivo'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingCaja(null)}
+                className="text-slate-400 hover:text-white font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditCaja} className="p-6 space-y-4 overflow-y-auto">
+              <div className="p-3 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-[11px]">
+                Solo se pueden modificar el <strong>nombre</strong> y la <strong>descripción</strong>. El saldo ({formatMoney(editingCaja.saldoActual)}), tipo e historial de operaciones permanecen intactos.
+              </div>
+
+              {editError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{editError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre de la Caja *</label>
+                <input
+                  type="text"
+                  required
+                  value={editNombre}
+                  onChange={(e) => setEditNombre(e.target.value)}
+                  placeholder="Ej. Caja Principal"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Descripción (Opcional)</label>
+                <textarea
+                  rows={3}
+                  value={editDescripcion}
+                  onChange={(e) => setEditDescripcion(e.target.value)}
+                  placeholder="Detalles adicionales o uso de la caja..."
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end space-x-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingCaja(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold rounded-lg text-xs shadow-xs transition disabled:opacity-50"
+                >
+                  {savingEdit ? 'Guardando...' : 'Guardar Cambios'}
                 </button>
               </div>
             </form>

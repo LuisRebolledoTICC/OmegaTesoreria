@@ -47,10 +47,17 @@ public class CajasController : ControllerBase
     [Authorize(Roles = "Administrador")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateCajaRequest request)
     {
-        var userName = User.Identity?.Name ?? "Admin";
-        var success = await _tesoreriaService.UpdateCajaAsync(id, request, userName);
-        if (!success) return NotFound();
-        return Ok(new { message = "Caja actualizada." });
+        try
+        {
+            var userName = User.Identity?.Name ?? "Admin";
+            var success = await _tesoreriaService.UpdateCajaAsync(id, request, userName);
+            if (!success) return NotFound(new { message = "Caja no encontrada." });
+            return Ok(new { message = "Caja actualizada correctamente." });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPatch("{id}/toggle-status")]

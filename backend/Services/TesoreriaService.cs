@@ -200,17 +200,20 @@ public class TesoreriaService : ITesoreriaService
 
     public async Task<bool> UpdateCajaAsync(int id, UpdateCajaRequest request, string userName)
     {
+        if (string.IsNullOrWhiteSpace(request.Nombre))
+            throw new ArgumentException("El nombre de la caja es obligatorio.");
+
         var caja = await _context.Cajas.FindAsync(id);
         if (caja == null) return false;
 
-        caja.Nombre = request.Nombre.Trim();
-        caja.Descripcion = request.Descripcion.Trim();
-        caja.Finalidad = request.Finalidad.Trim();
-        if (!string.IsNullOrWhiteSpace(request.Tipo))
-        {
-            caja.Tipo = request.Tipo.Trim().ToUpper();
-        }
-        caja.Activa = request.Activa;
+        var nombreAnterior = caja.Nombre;
+        var nuevoNombre = request.Nombre.Trim();
+        var nuevaDescripcion = (request.Descripcion ?? string.Empty).Trim();
+
+        // Únicamente se permite editar Nombre y Descripción; saldo, tipo, finalidad,
+        // estado activo e historial de operaciones permanecen intactos.
+        caja.Nombre = nuevoNombre;
+        caja.Descripcion = nuevaDescripcion;
 
         _context.Auditoria.Add(new Auditoria
         {
@@ -219,7 +222,7 @@ public class TesoreriaService : ITesoreriaService
             Entidad = "Caja",
             EntidadId = caja.Id.ToString(),
             FechaHora = DateTime.UtcNow,
-            Descripcion = $"Edición de información para la caja '{caja.Nombre}'"
+            Descripcion = $"Edición de detalles de caja #{caja.Id}: '{nombreAnterior}' -> '{nuevoNombre}'"
         });
 
         await _context.SaveChangesAsync();

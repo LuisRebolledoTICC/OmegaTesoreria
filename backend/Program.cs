@@ -22,6 +22,12 @@ if (args.Contains("--test-ventas"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--test-cajas"))
+{
+    var code = await OmegaTesoreria.Api.Tests.CajasTests.RunAllTestsAsync();
+    Environment.Exit(code);
+}
+
 // Soporte para despliegue en web pública (Render, Railway, Fly.io, etc.)
 var port = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrEmpty(port))

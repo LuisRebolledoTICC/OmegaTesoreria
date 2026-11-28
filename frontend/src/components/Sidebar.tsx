@@ -339,19 +339,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       )}
 
-      {/* Mobile Backdrop */}
+      {/* Mobile Backdrop: cubre toda la pantalla (incluido Navbar y MobileBottomNav) y bloquea eventos al fondo */}
       {isMobileOpen && (
         <div
-          onClick={() => setIsMobileOpen && setIsMobileOpen(false)}
-          className="fixed inset-0 bg-slate-950/60 z-40 md:hidden transition-opacity"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (setIsMobileOpen) setIsMobileOpen(false);
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onWheel={(e) => e.stopPropagation()}
+          className="fixed inset-0 bg-slate-950/65 backdrop-blur-[1px] z-40 md:hidden touch-none overscroll-none select-none"
           aria-hidden="true"
         />
       )}
 
       {/* Mobile Slide-Over Drawer (< md) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-slate-900 text-slate-200 flex flex-col h-dvh border-r border-slate-800 shadow-2xl transform transition-transform duration-300 ease-in-out md:hidden print:hidden select-none ${
-          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+        aria-hidden={!isMobileOpen}
+        {...(!isMobileOpen ? { inert: true } : {})}
+        onClick={(e) => e.stopPropagation()}
+        className={`fixed inset-y-0 left-0 z-[45] w-72 max-w-[85vw] bg-slate-900 text-slate-200 flex flex-col h-dvh border-r border-slate-800 shadow-2xl transform transition-transform duration-300 ease-in-out md:hidden print:hidden select-none overscroll-contain ${
+          isMobileOpen ? 'translate-x-0 pointer-events-auto' : '-translate-x-full pointer-events-none'
         }`}
       >
         {/* 1. Brand Header (Omega closes drawer on mobile) */}

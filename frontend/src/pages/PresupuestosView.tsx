@@ -1406,7 +1406,7 @@ export const PresupuestosView: React.FC<PresupuestosViewProps> = ({ cajas, onBal
 
       {/* ==================== MODAL: VER EVIDENCIAS FOTOGRÁFICAS ==================== */}
       {evidenciasModalMov && (
-        <div className="fixed inset-0 z-50 bg-slate-950/75 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] bg-slate-950/75 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden max-h-[90dvh] flex flex-col">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div>

@@ -70,7 +70,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   return (
     <nav
       aria-label="Navegación móvil"
-      className="md:hidden print:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.18)] pb-[env(safe-area-inset-bottom)]"
+      className="md:hidden print:hidden fixed bottom-0 inset-x-0 z-30 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.18)] pb-[env(safe-area-inset-bottom)]"
     >
       <div className="flex items-stretch justify-around px-1">
         {primaryTabs.map((tab) => {

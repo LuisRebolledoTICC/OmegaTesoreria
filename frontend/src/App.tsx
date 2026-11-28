@@ -84,6 +84,25 @@ const MainLayout: React.FC = () => {
     }
   }, [user]);
 
+  // Bloquear scroll y barras de navegación del fondo cuando exista cualquier modal abierto
+  useEffect(() => {
+    const syncModalBodyLock = () => {
+      const hasOpenModal = document.querySelector(
+        '.fixed.inset-0.z-50, .fixed.inset-0.z-\\[60\\]'
+      ) !== null;
+      document.body.classList.toggle('omega-modal-open', hasOpenModal || isMobileMenuOpen);
+    };
+
+    syncModalBodyLock();
+    const observer = new MutationObserver(syncModalBodyLock);
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      observer.disconnect();
+      document.body.classList.remove('omega-modal-open');
+    };
+  }, [isMobileMenuOpen]);
+
   // Redirigir automáticamente al primer módulo permitido si no hay pestaña o si se pierde acceso
   useEffect(() => {
     if (user) {
@@ -162,8 +181,14 @@ const MainLayout: React.FC = () => {
         setIsMobileOpen={setIsMobileMenuOpen}
       />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 h-dvh overflow-hidden print:h-auto print:overflow-visible">
+      {/* Main Content Area: bloqueado por completo cuando la sidebar móvil está abierta */}
+      <div
+        aria-hidden={isMobileMenuOpen}
+        {...(isMobileMenuOpen ? { inert: true } : {})}
+        className={`flex-1 flex flex-col min-w-0 h-dvh overflow-hidden print:h-auto print:overflow-visible ${
+          isMobileMenuOpen ? 'pointer-events-none select-none' : ''
+        }`}
+      >
         <Navbar
           title={titles[currentTab]}
           onRefresh={loadData}

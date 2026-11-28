@@ -21,6 +21,26 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Evitar que el scroll sobre overlays/modales se propague al contenido de fondo */
+.fixed.inset-0 {
+  overscroll-behavior: contain;
+}
+
+/* Bloquear scroll y eventos del fondo mientras haya un modal abierto */
+body.omega-modal-open {
+  overflow: hidden !important;
+}
+
+body.omega-modal-open main {
+  overflow: hidden !important;
+  overscroll-behavior: contain;
+}
+
+body.omega-modal-open header,
+body.omega-modal-open nav[aria-label="Navegación móvil"] {
+  pointer-events: none !important;
+}
+
 /* Evitar zoom automático en iOS Safari al enfocar inputs/selects menores a 16px */
 @media (max-width: 767px) {
   input:not([type="checkbox"]):not([type="radio"]),

@@ -18,7 +18,14 @@ public record VentaResumenDto(
     decimal TotalTransferencia,
     decimal TotalPendientePago,
     int? EntradaEfectivoOperacionId,
-    int? EntradaTransferenciaOperacionId
+    int? EntradaTransferenciaOperacionId,
+    List<ProductoVendidoResumenDto> ProductosVendidos
+);
+
+public record ProductoVendidoResumenDto(
+    int? ProductoId,
+    string ProductoNombre,
+    int CantidadTotal
 );
 
 public record CreateVentaRequest(string Nombre, DateTime FechaVenta);
@@ -50,7 +57,8 @@ public record VentaMetricasDto(
     decimal TotalVendido,
     decimal TotalEfectivo,
     decimal TotalTransferencia,
-    decimal TotalPendientePago
+    decimal TotalPendientePago,
+    List<ProductoVendidoResumenDto> ProductosVendidos
 );
 
 // Productos y Presentaciones

@@ -604,6 +604,23 @@ export const VentasView: React.FC<VentasViewProps> = ({ cajas, onEntradaRealizad
                     </div>
                   </div>
 
+                  {v.productosVendidos && v.productosVendidos.length > 0 && (
+                    <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Productos Vendidos</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {v.productosVendidos.map((pv, idx) => (
+                          <span
+                            key={`${pv.productoId ?? pv.productoNombre}-${idx}`}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-[11px] font-semibold text-amber-900"
+                          >
+                            <span>{pv.productoNombre}:</span>
+                            <strong className="font-black">{pv.cantidadTotal}</strong>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between pt-2 text-[11px] font-bold text-amber-600 group-hover:translate-x-0.5 transition">
                     <span>Administrar pedidos y productos</span>
                     <ChevronRight className="w-4 h-4" />
@@ -725,6 +742,56 @@ export const VentasView: React.FC<VentasViewProps> = ({ cajas, onEntradaRealizad
               <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block">Transferencias</span>
               <span className="text-lg font-black text-blue-800">${ventaDetalle.metricas.totalTransferencia.toFixed(2)}</span>
             </div>
+          </div>
+
+          {/* DESGLOSE DE UNIDADES VENDIDAS POR PRODUCTO */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-bold text-slate-800 flex items-center space-x-1.5">
+                <ShoppingBag className="w-4 h-4 text-amber-600" />
+                <span>Desglose de Productos Vendidos</span>
+              </h3>
+              <div className="flex items-center gap-3 text-xs text-slate-600">
+                <span>
+                  Pedidos: <strong className="text-slate-900">{ventaDetalle.metricas.totalPedidos}</strong>
+                  {ventaDetalle.metricas.pedidosCancelados > 0 && (
+                    <span className="text-slate-400 ml-1">({ventaDetalle.metricas.totalPedidos - ventaDetalle.metricas.pedidosCancelados} activos)</span>
+                  )}
+                </span>
+                <span>·</span>
+                <span>
+                  Total unidades:{' '}
+                  <strong className="text-amber-700">
+                    {(ventaDetalle.metricas.productosVendidos ?? []).reduce((sum, p) => sum + p.cantidadTotal, 0)}
+                  </strong>
+                </span>
+              </div>
+            </div>
+
+            {(!ventaDetalle.metricas.productosVendidos || ventaDetalle.metricas.productosVendidos.length === 0) ? (
+              <p className="text-xs text-slate-400 italic">
+                No hay unidades vendidas registradas en pedidos activos todavía.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+                {ventaDetalle.metricas.productosVendidos.map((prod, idx) => (
+                  <div
+                    key={`${prod.productoId ?? prod.productoNombre}-${idx}`}
+                    className="p-3 bg-amber-50/50 border border-amber-200/80 rounded-xl flex flex-col justify-between"
+                  >
+                    <span className="text-xs font-bold text-slate-800 truncate" title={prod.productoNombre}>
+                      {prod.productoNombre}
+                    </span>
+                    <div className="mt-1 flex items-baseline gap-1">
+                      <span className="text-lg font-black text-amber-800">{prod.cantidadTotal}</span>
+                      <span className="text-[11px] font-semibold text-slate-500">
+                        {prod.cantidadTotal === 1 ? 'unidad' : 'unidades'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* TABLA DE PRODUCTOS ACTIVOS DE ESTA VENTA */}

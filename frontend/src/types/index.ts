@@ -161,6 +161,12 @@ export interface RespaldoInfo {
 }
 
 // --- MÓDULO VENTAS ---
+export interface ProductoVendidoResumen {
+  productoId?: number | null;
+  productoNombre: string;
+  cantidadTotal: number;
+}
+
 export interface VentaResumen {
   id: number;
   nombre: string;
@@ -180,6 +186,7 @@ export interface VentaResumen {
   totalPendientePago: number;
   entradaEfectivoOperacionId?: number;
   entradaTransferenciaOperacionId?: number;
+  productosVendidos?: ProductoVendidoResumen[];
 }
 
 export interface VentaPresentacion {
@@ -243,6 +250,7 @@ export interface VentaMetricas {
   totalEfectivo: number;
   totalTransferencia: number;
   totalPendientePago: number;
+  productosVendidos?: ProductoVendidoResumen[];
 }
 
 export interface VentaDetalle {

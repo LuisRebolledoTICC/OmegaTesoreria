@@ -43,6 +43,8 @@ public class VentasService : IVentasService
     public async Task<List<VentaResumenDto>> GetVentasAsync()
     {
         var ventas = await _context.Ventas
+            .Include(v => v.Productos).ThenInclude(p => p.Presentaciones)
+            .Include(v => v.Pedidos).ThenInclude(p => p.Detalles)
             .Include(v => v.Pedidos).ThenInclude(p => p.Pagos)
             .OrderByDescending(v => v.FechaVenta)
             .ThenByDescending(v => v.Id)
@@ -61,7 +63,7 @@ public class VentasService : IVentasService
 
         if (v == null) return null;
 
-        var metricas = CalcularMetricas(v.Pedidos.ToList());
+        var metricas = CalcularMetricas(v.Pedidos.ToList(), v.Productos);
 
         var productosDto = v.Productos
             .OrderBy(p => p.Orden).ThenBy(p => p.Nombre)
@@ -790,7 +792,7 @@ public class VentasService : IVentasService
 
     private static VentaResumenDto CalcularResumenVenta(Venta v)
     {
-        var metricas = CalcularMetricas(v.Pedidos.ToList());
+        var metricas = CalcularMetricas(v.Pedidos.ToList(), v.Productos);
         return new VentaResumenDto(
             v.Id,
             v.Nombre,
@@ -809,11 +811,12 @@ public class VentasService : IVentasService
             metricas.TotalTransferencia,
             metricas.TotalPendientePago,
             v.EntradaEfectivoOperacionId,
-            v.EntradaTransferenciaOperacionId
+            v.EntradaTransferenciaOperacionId,
+            metricas.ProductosVendidos
         );
     }
 
-    private static VentaMetricasDto CalcularMetricas(List<Pedido> pedidos)
+    private static VentaMetricasDto CalcularMetricas(List<Pedido> pedidos, IEnumerable<VentaProducto>? productos = null)
     {
         int total = pedidos.Count;
         int entregados = pedidos.Count(p => p.EstadoEntrega == "ENTREGADO");
@@ -837,6 +840,8 @@ public class VentasService : IVentasService
         decimal totalPagado = totalEfectivo + totalTransferencia;
         decimal totalPendiente = totalVendido > totalPagado ? totalVendido - totalPagado : 0;
 
+        var productosVendidos = CalcularResumenProductos(pedidosValidos, productos);
+
         return new VentaMetricasDto(
             total,
             pendientes,
@@ -845,7 +850,71 @@ public class VentasService : IVentasService
             totalVendido,
             totalEfectivo,
             totalTransferencia,
-            totalPendiente
+            totalPendiente,
+            productosVendidos
         );
+    }
+
+    private static List<ProductoVendidoResumenDto> CalcularResumenProductos(
+        IEnumerable<Pedido> pedidosValidos,
+        IEnumerable<VentaProducto>? productos)
+    {
+        var presentacionToProducto = new Dictionary<int, (int ProductoId, string Nombre, int Orden)>();
+        if (productos != null)
+        {
+            foreach (var prod in productos)
+            {
+                if (prod.Presentaciones == null) continue;
+                foreach (var pres in prod.Presentaciones)
+                {
+                    presentacionToProducto[pres.Id] = (prod.Id, prod.Nombre, prod.Orden);
+                }
+            }
+        }
+
+        var agrupado = new Dictionary<string, (int? ProductoId, string Nombre, int Orden, int Cantidad)>();
+
+        foreach (var detalle in pedidosValidos.SelectMany(p => p.Detalles ?? Enumerable.Empty<PedidoDetalle>()))
+        {
+            if (detalle.Cantidad <= 0) continue;
+
+            string key;
+            int? productoId = null;
+            string nombre;
+            int orden = int.MaxValue;
+
+            if (detalle.VentaPresentacionId.HasValue &&
+                presentacionToProducto.TryGetValue(detalle.VentaPresentacionId.Value, out var info))
+            {
+                key = $"id:{info.ProductoId}";
+                productoId = info.ProductoId;
+                nombre = info.Nombre;
+                orden = info.Orden;
+            }
+            else
+            {
+                var limpio = string.IsNullOrWhiteSpace(detalle.ProductoNombre)
+                    ? "Producto"
+                    : detalle.ProductoNombre.Trim();
+                key = $"name:{limpio.ToLowerInvariant()}";
+                nombre = limpio;
+            }
+
+            if (agrupado.TryGetValue(key, out var acum))
+            {
+                agrupado[key] = (acum.ProductoId, acum.Nombre, acum.Orden, acum.Cantidad + detalle.Cantidad);
+            }
+            else
+            {
+                agrupado[key] = (productoId, nombre, orden, detalle.Cantidad);
+            }
+        }
+
+        return agrupado.Values
+            .OrderBy(x => x.Orden)
+            .ThenByDescending(x => x.Cantidad)
+            .ThenBy(x => x.Nombre, StringComparer.OrdinalIgnoreCase)
+            .Select(x => new ProductoVendidoResumenDto(x.ProductoId, x.Nombre, x.Cantidad))
+            .ToList();
     }
 }

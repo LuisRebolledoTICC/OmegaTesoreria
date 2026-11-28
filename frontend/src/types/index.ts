@@ -476,6 +476,7 @@ export interface AsignacionDeuda {
   usuarioNombre: string;
   estado: 'PENDIENTE' | 'PAGADO' | 'NO_ASISTIO';
   totalAbonado: number;
+  totalAjustes: number;
   saldoPendiente: number;
   deudaCorrespondiente: number;
   formaPago?: 'EFECTIVO' | 'TRANSFERENCIA' | null;
@@ -486,6 +487,25 @@ export interface AsignacionDeuda {
   registradoPagoPor?: string | null;
   fechaAsignacion: string;
   abonos?: HistorialPagoDeuda[];
+  ajustes?: AjusteDeuda[];
+}
+
+export interface AjusteDeuda {
+  id: number;
+  asignacionActividadDeudaId: number;
+  actividadDeudaId: number;
+  actividadNombre: string;
+  usuarioId: number;
+  usuarioNombre: string;
+  importe: number;
+  tipoAjuste: 'SALDO_PREVIO' | 'PERDONAR_DEUDA' | 'CORRECCION';
+  motivo: string;
+  estado: 'CONFIRMADO' | 'REVERTIDO';
+  fechaAjuste: string;
+  registradoPor: string;
+  fechaReversion?: string | null;
+  revertidoPor?: string | null;
+  motivoReversion?: string | null;
 }
 
 export interface UsuarioDeudaDetalle {

@@ -32,6 +32,7 @@ import {
   UsuarioDeudaDetalle,
   DeudasResumenGlobal,
   HistorialPagoDeuda,
+  AjusteDeuda,
   EventoOmega
 } from '../types';
 
@@ -971,6 +972,38 @@ export const api = {
       body: JSON.stringify({ motivo, historialPagoId }),
     });
     return handleResponse<AsignacionDeuda>(res);
+  },
+
+  async registrarAjusteDeuda(asignacionId: number, data: {
+    importe: number;
+    tipoAjuste: 'SALDO_PREVIO' | 'PERDONAR_DEUDA' | 'CORRECCION';
+    motivo: string;
+    fechaAjuste?: string;
+  }): Promise<AsignacionDeuda> {
+    const res = await fetch(`${API_BASE_URL}/deudas/asignaciones/${asignacionId}/ajustar`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<AsignacionDeuda>(res);
+  },
+
+  async revertirAjusteDeuda(ajusteId: number, motivo: string): Promise<AsignacionDeuda> {
+    const res = await fetch(`${API_BASE_URL}/deudas/ajustes/${ajusteId}/revertir`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ motivo }),
+    });
+    return handleResponse<AsignacionDeuda>(res);
+  },
+
+  async getHistorialAjustesDeuda(usuarioId?: number, actividadId?: number): Promise<AjusteDeuda[]> {
+    const params = new URLSearchParams();
+    if (usuarioId) params.append('usuarioId', String(usuarioId));
+    if (actividadId) params.append('actividadId', String(actividadId));
+    const q = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`${API_BASE_URL}/deudas/ajustes/historial${q}`, { headers: getHeaders() });
+    return handleResponse<AjusteDeuda[]>(res);
   },
 
   async getHistorialPagosDeuda(usuarioId?: number, actividadId?: number): Promise<HistorialPagoDeuda[]> {

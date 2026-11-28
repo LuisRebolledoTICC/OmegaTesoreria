@@ -35,6 +35,12 @@ public static class Permissions
     public const string DeudasPagosHistorial = "deudas_pagos_historial";
     public const string DeudasMovimientosBancarios = "deudas_movimientos_bancarios";
 
+    // ── Deudas: ajustes sin afectar cajas ───────────────────────────────────────
+    public const string DeudasAjustesSaldoPrevio = "deudas_ajustes_saldo_previo";
+    public const string DeudasAjustesPerdonar = "deudas_ajustes_perdonar";
+    public const string DeudasAjustesCorregir = "deudas_ajustes_corregir";
+    public const string DeudasAjustesRevertir = "deudas_ajustes_revertir";
+
     // ── Eventos: permisos ──────────────────────────────────────────────────────
     public const string EventosConsultar = "eventos_consultar";
     public const string EventosCrear = "eventos_crear";

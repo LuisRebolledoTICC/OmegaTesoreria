@@ -20,9 +20,12 @@ public interface IDeudasEventosService
 
     // Deudas - Cambios de estado y Pagos
     Task<AsignacionDeudaDto> RegistrarPagoAsync(int asignacionId, RegistrarPagoDeudaRequest request, int currentUserId, string currentUserName, bool isAdmin);
+    Task<AsignacionDeudaDto> RegistrarAjusteAsync(int asignacionId, RegistrarAjusteDeudaRequest request, int currentUserId, string currentUserName, bool isAdmin);
+    Task<AsignacionDeudaDto> RevertirAjusteAsync(int ajusteId, RevertirAjusteDeudaRequest request, int currentUserId, string currentUserName, bool isAdmin);
     Task<AsignacionDeudaDto> CambiarEstadoAsync(int asignacionId, CambiarEstadoAsignacionRequest request, int currentUserId, string currentUserName, bool isAdmin);
     Task<AsignacionDeudaDto> RevertirPagoAsync(int asignacionId, RevertirPagoDeudaRequest request, int currentUserId, string currentUserName, bool isAdmin);
     Task<List<HistorialPagoDeudaDto>> GetHistorialPagosAsync(int? usuarioId = null, int? actividadId = null);
+    Task<List<AjusteDeudaDto>> GetHistorialAjustesAsync(int? usuarioId = null, int? actividadId = null);
     Task<List<OperacionDto>> GetMovimientosBancariosDeudasAsync();
 
     // Eventos
@@ -85,6 +88,8 @@ public class DeudasEventosService : IDeudasEventosService
         var actividades = await _context.ActividadesDeuda
             .Include(a => a.Asignaciones)
                 .ThenInclude(asig => asig.HistorialPagos)
+            .Include(a => a.Asignaciones)
+                .ThenInclude(asig => asig.Ajustes)
             .OrderByDescending(a => a.FechaActividad)
             .ThenByDescending(a => a.Id)
             .ToListAsync();
@@ -111,7 +116,12 @@ public class DeudasEventosService : IDeudasEventosService
                 var abonado = (x.HistorialPagos ?? Enumerable.Empty<HistorialPagoDeuda>())
                     .Where(h => h.Estado == "CONFIRMADO")
                     .Sum(h => h.Importe);
-                return Math.Max(0m, a.Importe - abonado);
+
+                var ajustado = (x.Ajustes ?? Enumerable.Empty<AjusteDeuda>())
+                    .Where(j => j.Estado == "CONFIRMADO")
+                    .Sum(j => j.Importe);
+
+                return Math.Max(0m, a.Importe - (abonado + ajustado));
             });
 
         return new ActividadDeudaDto(
@@ -310,6 +320,7 @@ public class DeudasEventosService : IDeudasEventosService
         var asignaciones = await _context.AsignacionesActividadDeuda
             .Include(a => a.ActividadDeuda)
             .Include(a => a.HistorialPagos)
+            .Include(a => a.Ajustes)
             .Where(a => a.ActividadDeuda != null && a.ActividadDeuda.Activa)
             .ToListAsync();
 
@@ -350,6 +361,7 @@ public class DeudasEventosService : IDeudasEventosService
             .Include(a => a.ActividadDeuda)
             .Include(a => a.Caja)
             .Include(a => a.HistorialPagos)
+            .Include(a => a.Ajustes)
             .Where(a => a.UsuarioId == usuarioId && a.ActividadDeuda != null && a.ActividadDeuda.Activa)
             .OrderByDescending(a => a.ActividadDeuda!.FechaActividad)
             .ThenByDescending(a => a.Id)
@@ -378,6 +390,10 @@ public class DeudasEventosService : IDeudasEventosService
                 .Where(h => h.Estado == "CONFIRMADO")
                 .Sum(h => h.Importe);
 
+            var ajustesValidos = (a.Ajustes ?? Enumerable.Empty<AjusteDeuda>())
+                .Where(j => j.Estado == "CONFIRMADO")
+                .Sum(j => j.Importe);
+
             totalPagado += abonosValidos;
 
             if (a.Estado == "NO_ASISTIO")
@@ -391,7 +407,7 @@ public class DeudasEventosService : IDeudasEventosService
             else
             {
                 pend++;
-                var saldo = Math.Max(0m, importeOriginal - abonosValidos);
+                var saldo = Math.Max(0m, importeOriginal - (abonosValidos + ajustesValidos));
                 deudaTotal += saldo;
             }
         }
@@ -417,8 +433,17 @@ public class DeudasEventosService : IDeudasEventosService
             .Where(h => h.Estado == "CONFIRMADO")
             .ToList();
 
+        var ajustesConfirmados = (a.Ajustes ?? Enumerable.Empty<AjusteDeuda>())
+            .Where(j => j.Estado == "CONFIRMADO")
+            .ToList();
+
         decimal totalAbonado = abonosConfirmados.Sum(h => h.Importe);
-        decimal saldoPendiente = a.Estado == "NO_ASISTIO" ? 0m : Math.Max(0m, importeOriginal - totalAbonado);
+        decimal totalAjustes = ajustesConfirmados.Sum(j => j.Importe);
+
+        decimal saldoPendiente = a.Estado == "NO_ASISTIO"
+            ? 0m
+            : Math.Max(0m, importeOriginal - (totalAbonado + totalAjustes));
+
         decimal deuda = a.Estado == "PENDIENTE" ? saldoPendiente : 0m;
 
         var abonosDtos = (a.HistorialPagos ?? Enumerable.Empty<HistorialPagoDeuda>())
@@ -446,6 +471,28 @@ public class DeudasEventosService : IDeudasEventosService
             ))
             .ToList();
 
+        var ajustesDtos = (a.Ajustes ?? Enumerable.Empty<AjusteDeuda>())
+            .OrderByDescending(j => j.FechaAjuste)
+            .ThenByDescending(j => j.Id)
+            .Select(j => new AjusteDeudaDto(
+                j.Id,
+                j.AsignacionActividadDeudaId,
+                j.ActividadDeudaId,
+                a.ActividadDeuda?.Nombre ?? "Actividad",
+                j.UsuarioId,
+                usuarioNombre,
+                j.Importe,
+                j.TipoAjuste,
+                j.Motivo,
+                j.Estado,
+                j.FechaAjuste,
+                j.RegistradoPor,
+                j.FechaReversion,
+                j.RevertidoPor,
+                j.MotivoReversion
+            ))
+            .ToList();
+
         // Si hay un abono confirmado más reciente, usar su forma de pago y caja
         var ultimoAbono = abonosConfirmados.OrderByDescending(h => h.FechaPago).ThenByDescending(h => h.Id).FirstOrDefault();
         var formaPago = a.FormaPago ?? ultimoAbono?.FormaPago;
@@ -466,6 +513,7 @@ public class DeudasEventosService : IDeudasEventosService
             usuarioNombre,
             a.Estado,
             totalAbonado,
+            totalAjustes,
             saldoPendiente,
             deuda,
             formaPago,
@@ -475,7 +523,8 @@ public class DeudasEventosService : IDeudasEventosService
             fechaPago,
             registradoPor,
             a.FechaAsignacion,
-            abonosDtos
+            abonosDtos,
+            ajustesDtos
         );
     }
 
@@ -498,6 +547,7 @@ public class DeudasEventosService : IDeudasEventosService
             var asignacion = await _context.AsignacionesActividadDeuda
                 .Include(a => a.ActividadDeuda)
                 .Include(a => a.HistorialPagos)
+                .Include(a => a.Ajustes)
                 .Include(a => a.Usuario!)
                     .ThenInclude(u => u.UsuarioRoles)
                         .ThenInclude(ur => ur.RolPersonalizado)
@@ -518,7 +568,11 @@ public class DeudasEventosService : IDeudasEventosService
                 .Where(h => h.Estado == "CONFIRMADO")
                 .Sum(h => h.Importe);
 
-            decimal saldoPendiente = Math.Max(0m, importeOriginal - abonadoPrevio);
+            decimal ajustesPrevios = (asignacion.Ajustes ?? Enumerable.Empty<AjusteDeuda>())
+                .Where(j => j.Estado == "CONFIRMADO")
+                .Sum(j => j.Importe);
+
+            decimal saldoPendiente = Math.Max(0m, importeOriginal - (abonadoPrevio + ajustesPrevios));
             if (saldoPendiente <= 0)
                 throw new InvalidOperationException("Esta actividad ya está liquidada en su totalidad ($0.00 de saldo pendiente).");
 
@@ -590,7 +644,7 @@ public class DeudasEventosService : IDeudasEventosService
 
             // 4. Evaluar nuevo saldo pendiente y estado
             decimal nuevoAbonado = abonadoPrevio + montoAbono;
-            decimal nuevoSaldo = Math.Max(0m, importeOriginal - nuevoAbonado);
+            decimal nuevoSaldo = Math.Max(0m, importeOriginal - (nuevoAbonado + ajustesPrevios));
 
             if (nuevoSaldo == 0m)
             {
@@ -687,14 +741,17 @@ public class DeudasEventosService : IDeudasEventosService
             asignacion.UltimaActualizacion = DateTime.UtcNow;
             asignacion.ActualizadoPor = currentUserName;
 
-            // Si volvió a PENDIENTE, calcular si con abonos activos previos (si existieran) queda PAGADO o PENDIENTE
+            // Si volvió a PENDIENTE, calcular si con abonos y ajustes activos previos queda PAGADO o PENDIENTE
             if (nuevoEstado == "PENDIENTE")
             {
                 decimal importeOriginal = asignacion.ActividadDeuda?.Importe ?? 0m;
                 decimal abonado = (asignacion.HistorialPagos ?? Enumerable.Empty<HistorialPagoDeuda>())
                     .Where(h => h.Estado == "CONFIRMADO")
                     .Sum(h => h.Importe);
-                if (importeOriginal > 0 && abonado >= importeOriginal)
+                decimal ajustado = (asignacion.Ajustes ?? Enumerable.Empty<AjusteDeuda>())
+                    .Where(j => j.Estado == "CONFIRMADO")
+                    .Sum(j => j.Importe);
+                if (importeOriginal > 0 && (abonado + ajustado) >= importeOriginal)
                 {
                     asignacion.Estado = "PAGADO";
                 }
@@ -740,6 +797,7 @@ public class DeudasEventosService : IDeudasEventosService
                 .Include(a => a.ActividadDeuda)
                 .Include(a => a.Caja)
                 .Include(a => a.HistorialPagos)
+                .Include(a => a.Ajustes)
                 .Include(a => a.Usuario!)
                     .ThenInclude(u => u.UsuarioRoles)
                         .ThenInclude(ur => ur.RolPersonalizado)
@@ -779,7 +837,11 @@ public class DeudasEventosService : IDeudasEventosService
                 .Where(h => h.Estado == "CONFIRMADO")
                 .Sum(h => h.Importe);
 
-            if (abonadoRestante < importeOriginal)
+            decimal ajustesRestantes = (asignacion.Ajustes ?? Enumerable.Empty<AjusteDeuda>())
+                .Where(j => j.Estado == "CONFIRMADO")
+                .Sum(j => j.Importe);
+
+            if ((abonadoRestante + ajustesRestantes) < importeOriginal)
             {
                 asignacion.Estado = "PENDIENTE";
             }
@@ -886,6 +948,252 @@ public class DeudasEventosService : IDeudasEventosService
             FechaHora = DateTime.UtcNow,
             Descripcion = $"Reversión de abono de ${opOriginal.Importe:N2} MXN (Op #{opOriginal.Id} -> Reversa #{opReversa.Id}) de '{asignacion.ActividadDeuda?.Nombre}'. Motivo: {motivo}"
         });
+    }
+
+    // ─── AJUSTES DE DEUDA (SIN IMPACTO EN CAJAS NI MOVIMIENTOS BANCARIOS) ────────
+
+    public async Task<AsignacionDeudaDto> RegistrarAjusteAsync(
+        int asignacionId,
+        RegistrarAjusteDeudaRequest request,
+        int currentUserId,
+        string currentUserName,
+        bool isAdmin)
+    {
+        var tipoAjuste = (request.TipoAjuste ?? "").Trim().ToUpperInvariant();
+        if (tipoAjuste != "SALDO_PREVIO" && tipoAjuste != "PERDONAR_DEUDA" && tipoAjuste != "CORRECCION")
+            throw new InvalidOperationException("El tipo de ajuste debe ser SALDO_PREVIO, PERDONAR_DEUDA o CORRECCION.");
+
+        if (string.IsNullOrWhiteSpace(request.Motivo))
+            throw new InvalidOperationException("El motivo o descripción del ajuste es obligatorio.");
+
+        if (request.Importe <= 0)
+            throw new InvalidOperationException("El importe a descontar debe ser mayor a cero.");
+
+        using var tx = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var asignacion = await _context.AsignacionesActividadDeuda
+                .Include(a => a.ActividadDeuda)
+                .Include(a => a.HistorialPagos)
+                .Include(a => a.Ajustes)
+                .Include(a => a.Usuario!)
+                    .ThenInclude(u => u.UsuarioRoles)
+                        .ThenInclude(ur => ur.RolPersonalizado)
+                .FirstOrDefaultAsync(a => a.Id == asignacionId)
+                ?? throw new KeyNotFoundException("Registro de deuda no encontrado.");
+
+            if (asignacion.Usuario != null && IsUserAdmin(asignacion.Usuario) && !isAdmin)
+                throw new InvalidOperationException("No tienes permiso para modificar deudas de usuarios administradores.");
+
+            if (asignacion.Estado == "NO_ASISTIO")
+                throw new InvalidOperationException("No se pueden registrar ajustes a una actividad marcada como 'No asistió'.");
+
+            decimal importeOriginal = asignacion.ActividadDeuda?.Importe ?? 0m;
+            if (importeOriginal <= 0)
+                throw new InvalidOperationException("El importe original de la actividad debe ser mayor a cero.");
+
+            decimal abonadoPrevio = (asignacion.HistorialPagos ?? Enumerable.Empty<HistorialPagoDeuda>())
+                .Where(h => h.Estado == "CONFIRMADO")
+                .Sum(h => h.Importe);
+
+            decimal ajustesPrevios = (asignacion.Ajustes ?? Enumerable.Empty<AjusteDeuda>())
+                .Where(j => j.Estado == "CONFIRMADO")
+                .Sum(j => j.Importe);
+
+            decimal saldoPendiente = Math.Max(0m, importeOriginal - (abonadoPrevio + ajustesPrevios));
+            if (saldoPendiente <= 0)
+                throw new InvalidOperationException("Esta actividad ya tiene un saldo pendiente de $0.00.");
+
+            if (request.Importe > saldoPendiente)
+                throw new InvalidOperationException($"El importe a descontar (${request.Importe:N2}) supera el saldo pendiente de la actividad (${saldoPendiente:N2}).");
+
+            var fechaAjuste = request.FechaAjuste.HasValue ? EnsureUtc(request.FechaAjuste.Value) : DateTime.UtcNow;
+            var usuarioNombre = asignacion.Usuario?.Nombre ?? $"Usuario #{asignacion.UsuarioId}";
+            var actividadNombre = asignacion.ActividadDeuda?.Nombre ?? "Actividad";
+
+            // 1. Crear el registro inmutable de AjusteDeuda
+            // (SIN tocar saldo de ninguna caja ni insertar en Operaciones / Movimientos Bancarios)
+            var ajuste = new AjusteDeuda
+            {
+                AsignacionActividadDeudaId = asignacion.Id,
+                ActividadDeudaId = asignacion.ActividadDeudaId,
+                UsuarioId = asignacion.UsuarioId,
+                Importe = request.Importe,
+                TipoAjuste = tipoAjuste,
+                Motivo = request.Motivo.Trim(),
+                Estado = "CONFIRMADO",
+                FechaAjuste = fechaAjuste,
+                RegistradoPor = currentUserName
+            };
+
+            _context.AjustesDeuda.Add(ajuste);
+            await _context.SaveChangesAsync();
+
+            // 2. Evaluar nuevo saldo pendiente y estado
+            decimal nuevoAjustado = ajustesPrevios + request.Importe;
+            decimal nuevoSaldo = Math.Max(0m, importeOriginal - (abonadoPrevio + nuevoAjustado));
+
+            if (nuevoSaldo == 0m)
+            {
+                asignacion.Estado = "PAGADO";
+            }
+            else
+            {
+                asignacion.Estado = "PENDIENTE";
+            }
+
+            asignacion.UltimaActualizacion = DateTime.UtcNow;
+            asignacion.ActualizadoPor = currentUserName;
+
+            // 3. Auditoría
+            _context.Auditoria.Add(new Auditoria
+            {
+                UsuarioId = currentUserId,
+                UsuarioNombre = currentUserName,
+                Accion = "AJUSTE_DEUDA",
+                Entidad = "AjusteDeuda",
+                EntidadId = ajuste.Id.ToString(),
+                FechaHora = DateTime.UtcNow,
+                Descripcion = $"Ajuste de deuda ({tipoAjuste}) de ${request.Importe:N2} MXN en '{actividadNombre}' de {usuarioNombre}. Saldo restante: ${nuevoSaldo:N2}. Motivo: {request.Motivo.Trim()}"
+            });
+
+            await _context.SaveChangesAsync();
+            await tx.CommitAsync();
+
+            return MapAsignacionDto(asignacion, usuarioNombre);
+        }
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
+    }
+
+    public async Task<AsignacionDeudaDto> RevertirAjusteAsync(
+        int ajusteId,
+        RevertirAjusteDeudaRequest request,
+        int currentUserId,
+        string currentUserName,
+        bool isAdmin)
+    {
+        if (string.IsNullOrWhiteSpace(request.Motivo))
+            throw new InvalidOperationException("Debes indicar el motivo de la reversión del ajuste.");
+
+        using var tx = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var ajuste = await _context.AjustesDeuda
+                .Include(j => j.Asignacion)
+                    .ThenInclude(asig => asig!.ActividadDeuda)
+                .Include(j => j.Asignacion)
+                    .ThenInclude(asig => asig!.HistorialPagos)
+                .Include(j => j.Asignacion)
+                    .ThenInclude(asig => asig!.Ajustes)
+                .Include(j => j.Usuario!)
+                    .ThenInclude(u => u.UsuarioRoles)
+                        .ThenInclude(ur => ur.RolPersonalizado)
+                .FirstOrDefaultAsync(j => j.Id == ajusteId)
+                ?? throw new KeyNotFoundException("Ajuste de deuda no encontrado.");
+
+            if (ajuste.Usuario != null && IsUserAdmin(ajuste.Usuario) && !isAdmin)
+                throw new InvalidOperationException("No tienes permiso para modificar deudas de usuarios administradores.");
+
+            if (ajuste.Estado != "CONFIRMADO")
+                throw new InvalidOperationException("Este ajuste ya fue revertido con anterioridad.");
+
+            var asignacion = ajuste.Asignacion
+                ?? throw new InvalidOperationException("No se encontró la asignación de actividad vinculada a este ajuste.");
+
+            // 1. Marcar el ajuste como REVERTIDO (sin tocar cajas ni bancos)
+            ajuste.Estado = "REVERTIDO";
+            ajuste.FechaReversion = DateTime.UtcNow;
+            ajuste.RevertidoPor = currentUserName;
+            ajuste.MotivoReversion = request.Motivo.Trim();
+
+            // 2. Recalcular saldo pendiente
+            decimal importeOriginal = asignacion.ActividadDeuda?.Importe ?? 0m;
+            decimal abonado = (asignacion.HistorialPagos ?? Enumerable.Empty<HistorialPagoDeuda>())
+                .Where(h => h.Estado == "CONFIRMADO")
+                .Sum(h => h.Importe);
+
+            decimal ajustesActivos = (asignacion.Ajustes ?? Enumerable.Empty<AjusteDeuda>())
+                .Where(j => j.Id != ajuste.Id && j.Estado == "CONFIRMADO")
+                .Sum(j => j.Importe);
+
+            decimal nuevoSaldo = Math.Max(0m, importeOriginal - (abonado + ajustesActivos));
+
+            if (nuevoSaldo > 0m)
+            {
+                asignacion.Estado = "PENDIENTE";
+            }
+            else
+            {
+                asignacion.Estado = "PAGADO";
+            }
+
+            asignacion.UltimaActualizacion = DateTime.UtcNow;
+            asignacion.ActualizadoPor = currentUserName;
+
+            // 3. Auditoría
+            _context.Auditoria.Add(new Auditoria
+            {
+                UsuarioId = currentUserId,
+                UsuarioNombre = currentUserName,
+                Accion = "REVERTIR_AJUSTE_DEUDA",
+                Entidad = "AjusteDeuda",
+                EntidadId = ajuste.Id.ToString(),
+                FechaHora = DateTime.UtcNow,
+                Descripcion = $"Reversión de ajuste #{ajuste.Id} ({ajuste.TipoAjuste} por ${ajuste.Importe:N2} MXN) de '{asignacion.ActividadDeuda?.Nombre}'. Motivo: {request.Motivo.Trim()}"
+            });
+
+            await _context.SaveChangesAsync();
+            await tx.CommitAsync();
+
+            var usuarioNombre = ajuste.Usuario?.Nombre ?? $"Usuario #{ajuste.UsuarioId}";
+            return MapAsignacionDto(asignacion, usuarioNombre);
+        }
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
+    }
+
+    public async Task<List<AjusteDeudaDto>> GetHistorialAjustesAsync(int? usuarioId = null, int? actividadId = null)
+    {
+        var query = _context.AjustesDeuda
+            .Include(j => j.ActividadDeuda)
+            .Include(j => j.Usuario)
+            .AsQueryable();
+
+        if (usuarioId.HasValue)
+            query = query.Where(j => j.UsuarioId == usuarioId.Value);
+
+        if (actividadId.HasValue)
+            query = query.Where(j => j.ActividadDeudaId == actividadId.Value);
+
+        var items = await query
+            .OrderByDescending(j => j.FechaAjuste)
+            .ThenByDescending(j => j.Id)
+            .ToListAsync();
+
+        return items.Select(j => new AjusteDeudaDto(
+            j.Id,
+            j.AsignacionActividadDeudaId,
+            j.ActividadDeudaId,
+            j.ActividadDeuda?.Nombre ?? "Actividad",
+            j.UsuarioId,
+            j.Usuario?.Nombre ?? $"Usuario #{j.UsuarioId}",
+            j.Importe,
+            j.TipoAjuste,
+            j.Motivo,
+            j.Estado,
+            j.FechaAjuste,
+            j.RegistradoPor,
+            j.FechaReversion,
+            j.RevertidoPor,
+            j.MotivoReversion
+        )).ToList();
     }
 
     public async Task<List<HistorialPagoDeudaDto>> GetHistorialPagosAsync(int? usuarioId = null, int? actividadId = null)

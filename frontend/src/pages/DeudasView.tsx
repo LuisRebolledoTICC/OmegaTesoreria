@@ -15,12 +15,14 @@ import {
   Search,
   X,
   ArrowLeftRight,
-  UserX
+  UserX,
+  SlidersHorizontal
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import {
   ActividadDeuda,
+  AjusteDeuda,
   AsignacionDeuda,
   Caja,
   DeudasResumenGlobal,
@@ -46,8 +48,13 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
   const canRevertirPago = isAdmin || canAccessModule('deudas_pagos_revertir');
   const canVerHistorial = isAdmin || canAccessModule('deudas_pagos_historial');
   const canVerMovimientos = isAdmin || canAccessModule('deudas_movimientos_bancarios');
+  const canAjusteSaldoPrevio = isAdmin || canAccessModule('deudas_ajustes_saldo_previo');
+  const canAjustePerdonar = isAdmin || canAccessModule('deudas_ajustes_perdonar');
+  const canAjusteCorregir = isAdmin || canAccessModule('deudas_ajustes_corregir');
+  const canRevertirAjuste = isAdmin || canAccessModule('deudas_ajustes_revertir');
+  const canAjustarDeuda = canAjusteSaldoPrevio || canAjustePerdonar || canAjusteCorregir;
 
-  type SubTab = 'usuarios' | 'mis_deudas' | 'actividades' | 'historial' | 'movimientos';
+  type SubTab = 'usuarios' | 'mis_deudas' | 'actividades' | 'historial' | 'ajustes' | 'movimientos';
   const [subTab, setSubTab] = useState<SubTab>(() => (canVerTodos ? 'usuarios' : 'mis_deudas'));
 
   const [resumenGlobal, setResumenGlobal] = useState<DeudasResumenGlobal | null>(null);
@@ -56,6 +63,7 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
   const [misDeudas, setMisDeudas] = useState<UsuarioDeudaDetalle | null>(null);
   const [actividades, setActividades] = useState<ActividadDeuda[]>([]);
   const [historialPagos, setHistorialPagos] = useState<HistorialPagoDeuda[]>([]);
+  const [historialAjustes, setHistorialAjustes] = useState<AjusteDeuda[]>([]);
   const [movimientosBancarios, setMovimientosBancarios] = useState<Operacion[]>([]);
 
   const [loading, setLoading] = useState(true);
@@ -90,6 +98,21 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
   const [savingReversion, setSavingReversion] = useState(false);
   const [reversionError, setReversionError] = useState<string | null>(null);
 
+  // Modal Ajustar Deuda (sin cajas)
+  const [ajustandoAsig, setAjustandoAsig] = useState<AsignacionDeuda | null>(null);
+  const [montoAjuste, setMontoAjuste] = useState<string>('');
+  const [tipoAjuste, setTipoAjuste] = useState<'SALDO_PREVIO' | 'PERDONAR_DEUDA' | 'CORRECCION'>('SALDO_PREVIO');
+  const [motivoAjuste, setMotivoAjuste] = useState('');
+  const [fechaAjuste, setFechaAjuste] = useState(() => new Date().toISOString().slice(0, 10));
+  const [savingAjuste, setSavingAjuste] = useState(false);
+  const [ajusteError, setAjusteError] = useState<string | null>(null);
+
+  // Modal Revertir Ajuste
+  const [revirtiendoAjusteItem, setRevirtiendoAjusteItem] = useState<{ asig: AsignacionDeuda; ajuste: AjusteDeuda } | null>(null);
+  const [motivoReversionAjuste, setMotivoReversionAjuste] = useState('');
+  const [savingReversionAjuste, setSavingReversionAjuste] = useState(false);
+  const [reversionAjusteError, setReversionAjusteError] = useState<string | null>(null);
+
   // Expansión de historial de abonos por actividad
   const [expandedAbonos, setExpandedAbonos] = useState<Record<number, boolean>>({});
 
@@ -115,6 +138,8 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
         setActividades(await api.getActividadesDeuda());
       } else if (targetTab === 'historial' && canVerHistorial) {
         setHistorialPagos(await api.getHistorialPagosDeuda());
+      } else if (targetTab === 'ajustes' && canVerHistorial) {
+        setHistorialAjustes(await api.getHistorialAjustesDeuda());
       } else if (targetTab === 'movimientos' && canVerMovimientos) {
         setMovimientosBancarios(await api.getMovimientosBancariosDeudas());
       }
@@ -330,6 +355,86 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
     }
   };
 
+  // ── Handlers Ajustes de Deuda (Sin Cajas) ──────────────────────────────────
+
+  const openAjustarModal = (asig: AsignacionDeuda) => {
+    setAjustandoAsig(asig);
+    setMontoAjuste('');
+    if (canAjusteSaldoPrevio) setTipoAjuste('SALDO_PREVIO');
+    else if (canAjustePerdonar) setTipoAjuste('PERDONAR_DEUDA');
+    else setTipoAjuste('CORRECCION');
+    setMotivoAjuste('');
+    setFechaAjuste(new Date().toISOString().slice(0, 10));
+    setAjusteError(null);
+  };
+
+  const handleConfirmAjuste = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ajustandoAsig) return;
+    const monto = Number(montoAjuste);
+    if (isNaN(monto) || monto <= 0) {
+      setAjusteError('El importe a descontar debe ser mayor a cero.');
+      return;
+    }
+    if (monto > ajustandoAsig.saldoPendiente) {
+      setAjusteError(`El importe a descontar no puede superar el saldo pendiente (${formatMoney(ajustandoAsig.saldoPendiente)}).`);
+      return;
+    }
+    if (!motivoAjuste.trim()) {
+      setAjusteError('El motivo o descripción del ajuste es obligatorio.');
+      return;
+    }
+
+    setSavingAjuste(true);
+    setAjusteError(null);
+    try {
+      await api.registrarAjusteDeuda(ajustandoAsig.id, {
+        importe: monto,
+        tipoAjuste,
+        motivo: motivoAjuste.trim(),
+        fechaAjuste: new Date(fechaAjuste + 'T12:00:00Z').toISOString(),
+      });
+      setAjustandoAsig(null);
+      const labelTipo = tipoAjuste === 'SALDO_PREVIO' ? 'Saldo previo' : tipoAjuste === 'PERDONAR_DEUDA' ? 'Deuda perdonada' : 'Corrección';
+      setSuccessMsg(`Ajuste (${labelTipo}) de ${formatMoney(monto)} registrado correctamente sin afectar cajas ni bancos.`);
+      if (selectedUserId !== null) await loadDetalleUsuario(selectedUserId);
+      if (canVerTodos) setResumenGlobal(await api.getDeudasResumenGlobal());
+    } catch (err: any) {
+      setAjusteError(err.message || 'No se pudo registrar el ajuste.');
+    } finally {
+      setSavingAjuste(false);
+    }
+  };
+
+  const openRevertirAjusteModal = (asig: AsignacionDeuda, ajuste: AjusteDeuda) => {
+    setRevirtiendoAjusteItem({ asig, ajuste });
+    setMotivoReversionAjuste('');
+    setReversionAjusteError(null);
+  };
+
+  const handleConfirmReversionAjuste = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!revirtiendoAjusteItem) return;
+    if (!motivoReversionAjuste.trim()) {
+      setReversionAjusteError('El motivo de reversión es obligatorio.');
+      return;
+    }
+
+    setSavingReversionAjuste(true);
+    setReversionAjusteError(null);
+    try {
+      await api.revertirAjusteDeuda(revirtiendoAjusteItem.ajuste.id, motivoReversionAjuste.trim());
+      setRevirtiendoAjusteItem(null);
+      setSuccessMsg('Ajuste revertido correctamente. El saldo pendiente de la actividad y la deuda fueron recalculados.');
+      if (selectedUserId !== null) await loadDetalleUsuario(selectedUserId);
+      if (canVerTodos) setResumenGlobal(await api.getDeudasResumenGlobal());
+    } catch (err: any) {
+      setReversionAjusteError(err.message || 'No se pudo revertir el ajuste.');
+    } finally {
+      setSavingReversionAjuste(false);
+    }
+  };
+
   const usuariosFiltrados = (resumenGlobal?.usuarios ?? []).filter((u) =>
     u.nombre.toLowerCase().includes(searchUsuario.toLowerCase()) ||
     u.userName.toLowerCase().includes(searchUsuario.toLowerCase())
@@ -373,10 +478,11 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
                     <th className="py-3 px-4">Actividad</th>
                     <th className="py-3 px-4">Fecha</th>
                     <th className="py-3 px-4 text-right">Importe Original</th>
-                    <th className="py-3 px-4 text-right">Total Abonado</th>
+                    <th className="py-3 px-4 text-right">Abonos</th>
+                    <th className="py-3 px-4 text-right">Ajustes</th>
                     <th className="py-3 px-4 text-right">Saldo Pendiente</th>
                     <th className="py-3 px-4 text-center">Estado</th>
-                    <th className="py-3 px-4 text-center">Historial Abonos</th>
+                    <th className="py-3 px-4 text-center">Historial</th>
                     {allowActions && <th className="py-3 px-4 text-center">Acciones</th>}
                   </tr>
                 </thead>
@@ -384,6 +490,8 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
                   {detalle.actividades.map((a) => {
                     const isExpanded = !!expandedAbonos[a.id];
                     const numAbonos = a.abonos?.length ?? 0;
+                    const numAjustes = a.ajustes?.length ?? 0;
+                    const totalRegistros = numAbonos + numAjustes;
                     return (
                       <React.Fragment key={a.id}>
                         <tr className="hover:bg-slate-50">
@@ -401,6 +509,9 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
                           </td>
                           <td className="py-3 px-4 text-right font-semibold text-emerald-700 whitespace-nowrap">
                             {formatMoney(a.totalAbonado)}
+                          </td>
+                          <td className="py-3 px-4 text-right font-semibold text-purple-700 whitespace-nowrap">
+                            {formatMoney(a.totalAjustes || 0)}
                           </td>
                           <td className="py-3 px-4 text-right font-bold whitespace-nowrap">
                             <span className={a.saldoPendiente > 0 ? 'text-rose-700 font-black' : 'text-slate-500'}>
@@ -427,14 +538,14 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
                               className={`px-2 py-1 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 mx-auto cursor-pointer ${
                                 isExpanded
                                   ? 'bg-slate-900 text-amber-400'
-                                  : numAbonos > 0
+                                  : totalRegistros > 0
                                   ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                                   : 'bg-slate-50 text-slate-400 hover:bg-slate-100'
                               }`}
-                              title="Ver historial de abonos de esta actividad"
+                              title="Ver historial de abonos y ajustes de esta actividad"
                             >
                               <History className="w-3 h-3" />
-                              <span>{numAbonos} abono(s)</span>
+                              <span>{numAbonos} abono(s) / {numAjustes} ajuste(s)</span>
                             </button>
                           </td>
                           {allowActions && (
@@ -447,6 +558,17 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
                                     className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition cursor-pointer"
                                   >
                                     Abonar / Pagar
+                                  </button>
+                                )}
+                                {a.estado !== 'NO_ASISTIO' && a.saldoPendiente > 0 && canAjustarDeuda && (
+                                  <button
+                                    type="button"
+                                    onClick={() => openAjustarModal(a)}
+                                    className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 rounded-lg text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                                    title="Ajustar deuda (Saldo previo, perdonar, corrección) sin afectar cajas"
+                                  >
+                                    <SlidersHorizontal className="w-3 h-3" />
+                                    <span>Ajustar deuda</span>
                                   </button>
                                 )}
                                 {a.estado === 'PENDIENTE' && (canAsignarActividad || canRegistrarPago) && (
@@ -468,7 +590,7 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
                                     Volver a Pendiente
                                   </button>
                                 )}
-                                {a.estado === 'PAGADO' && canRevertirPago && (
+                                {a.estado === 'PAGADO' && canRevertirPago && numAbonos > 0 && (
                                   <button
                                     type="button"
                                     onClick={() => openRevertirModal(a)}
@@ -476,7 +598,7 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
                                     title="Revertir último abono"
                                   >
                                     <RotateCcw className="w-3 h-3" />
-                                    <span>Revertir</span>
+                                    <span>Revertir Abono</span>
                                   </button>
                                 )}
                               </div>
@@ -484,99 +606,193 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
                           )}
                         </tr>
 
-                        {/* Desglose de abonos de la actividad */}
+                        {/* Desglose de abonos y ajustes de la actividad */}
                         {isExpanded && (
                           <tr className="bg-slate-50/80">
-                            <td colSpan={allowActions ? 8 : 7} className="p-3 border-y border-slate-200">
-                              <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-xs space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                                    <History className="w-3.5 h-3.5 text-slate-500" />
-                                    <span>Historial de Abonos: {a.actividadNombre}</span>
-                                  </h4>
-                                  <span className="text-[11px] text-slate-500 font-semibold">
-                                    Total abonado: <strong className="text-emerald-700">{formatMoney(a.totalAbonado)}</strong> de {formatMoney(a.importeOriginal)}
-                                  </span>
-                                </div>
+                            <td colSpan={allowActions ? 9 : 8} className="p-3 border-y border-slate-200">
+                              <div className="space-y-3">
+                                <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-xs space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                      <Banknote className="w-3.5 h-3.5 text-emerald-600" />
+                                      <span>Abonos en Caja (Dinero Real): {a.actividadNombre}</span>
+                                    </h4>
+                                    <span className="text-[11px] text-slate-500 font-semibold">
+                                      Total abonado: <strong className="text-emerald-700">{formatMoney(a.totalAbonado)}</strong> de {formatMoney(a.importeOriginal)}
+                                    </span>
+                                  </div>
 
-                                {(!a.abonos || a.abonos.length === 0) ? (
-                                  <p className="text-[11px] text-slate-400 py-2 text-center">
-                                    No hay abonos registrados para esta actividad.
-                                  </p>
-                                ) : (
-                                  <table className="w-full text-[11px] text-left">
-                                    <thead className="bg-slate-100 text-slate-600 font-bold uppercase border-b border-slate-200">
-                                      <tr>
-                                        <th className="py-1.5 px-3">Fecha</th>
-                                        <th className="py-1.5 px-3 text-right">Importe</th>
-                                        <th className="py-1.5 px-3">Forma de Pago</th>
-                                        <th className="py-1.5 px-3">Caja</th>
-                                        <th className="py-1.5 px-3">Registrado Por</th>
-                                        <th className="py-1.5 px-3">Mov. Bancario</th>
-                                        <th className="py-1.5 px-3 text-center">Estado</th>
-                                        {allowActions && canRevertirPago && <th className="py-1.5 px-3 text-center">Acción</th>}
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                      {a.abonos.map((abono) => (
-                                        <tr key={abono.id} className="hover:bg-slate-50">
-                                          <td className="py-1.5 px-3 whitespace-nowrap text-slate-600">
-                                            {new Date(abono.fechaPago).toLocaleString('es-MX')}
-                                          </td>
-                                          <td className="py-1.5 px-3 text-right font-bold text-slate-900 whitespace-nowrap">
-                                            {formatMoney(abono.importe)}
-                                          </td>
-                                          <td className="py-1.5 px-3">
-                                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                              abono.formaPago === 'EFECTIVO' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
-                                            }`}>
-                                              {abono.formaPago}
-                                            </span>
-                                          </td>
-                                          <td className="py-1.5 px-3 font-medium text-slate-700">
-                                            {abono.cajaNombre}
-                                          </td>
-                                          <td className="py-1.5 px-3 text-slate-600">
-                                            {abono.registradoPor}
-                                          </td>
-                                          <td className="py-1.5 px-3 font-mono text-slate-600">
-                                            Op #{abono.operacionTesoreriaId}
-                                            {abono.operacionReversaId && (
-                                              <span className="text-rose-600"> (Rev #{abono.operacionReversaId})</span>
-                                            )}
-                                          </td>
-                                          <td className="py-1.5 px-3 text-center">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                              abono.estado === 'CONFIRMADO'
-                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                                : 'bg-rose-50 text-rose-700 border border-rose-200'
-                                            }`}>
-                                              {abono.estado}
-                                            </span>
-                                            {abono.estado === 'REVERTIDO' && abono.motivoReversion && (
-                                              <p className="text-[10px] text-rose-600 mt-0.5">{abono.motivoReversion}</p>
-                                            )}
-                                          </td>
-                                          {allowActions && canRevertirPago && (
-                                            <td className="py-1.5 px-3 text-center whitespace-nowrap">
-                                              {abono.estado === 'CONFIRMADO' && (
-                                                <button
-                                                  type="button"
-                                                  onClick={() => openRevertirModal(a, abono)}
-                                                  className="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-[10px] font-bold inline-flex items-center gap-1 transition cursor-pointer"
-                                                  title="Revertir este abono específico"
-                                                >
-                                                  <RotateCcw className="w-2.5 h-2.5" />
-                                                  <span>Revertir</span>
-                                                </button>
+                                  {(!a.abonos || a.abonos.length === 0) ? (
+                                    <p className="text-[11px] text-slate-400 py-1 text-center">
+                                      No hay abonos en caja registrados para esta actividad.
+                                    </p>
+                                  ) : (
+                                    <table className="w-full text-[11px] text-left">
+                                      <thead className="bg-slate-100 text-slate-600 font-bold uppercase border-b border-slate-200">
+                                        <tr>
+                                          <th className="py-1.5 px-3">Fecha</th>
+                                          <th className="py-1.5 px-3 text-right">Importe</th>
+                                          <th className="py-1.5 px-3">Forma de Pago</th>
+                                          <th className="py-1.5 px-3">Caja</th>
+                                          <th className="py-1.5 px-3">Registrado Por</th>
+                                          <th className="py-1.5 px-3">Mov. Bancario</th>
+                                          <th className="py-1.5 px-3 text-center">Estado</th>
+                                          {allowActions && canRevertirPago && <th className="py-1.5 px-3 text-center">Acción</th>}
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-100">
+                                        {a.abonos.map((abono) => (
+                                          <tr key={abono.id} className="hover:bg-slate-50">
+                                            <td className="py-1.5 px-3 whitespace-nowrap text-slate-600">
+                                              {new Date(abono.fechaPago).toLocaleString('es-MX')}
+                                            </td>
+                                            <td className="py-1.5 px-3 text-right font-bold text-slate-900 whitespace-nowrap">
+                                              {formatMoney(abono.importe)}
+                                            </td>
+                                            <td className="py-1.5 px-3">
+                                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                                abono.formaPago === 'EFECTIVO' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
+                                              }`}>
+                                                {abono.formaPago}
+                                              </span>
+                                            </td>
+                                            <td className="py-1.5 px-3 font-medium text-slate-700">
+                                              {abono.cajaNombre}
+                                            </td>
+                                            <td className="py-1.5 px-3 text-slate-600">
+                                              {abono.registradoPor}
+                                            </td>
+                                            <td className="py-1.5 px-3 font-mono text-slate-600">
+                                              Op #{abono.operacionTesoreriaId}
+                                              {abono.operacionReversaId && (
+                                                <span className="text-rose-600"> (Rev #{abono.operacionReversaId})</span>
                                               )}
                                             </td>
-                                          )}
+                                            <td className="py-1.5 px-3 text-center">
+                                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                abono.estado === 'CONFIRMADO'
+                                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                  : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                              }`}>
+                                                {abono.estado}
+                                              </span>
+                                              {abono.estado === 'REVERTIDO' && abono.motivoReversion && (
+                                                <p className="text-[10px] text-rose-600 mt-0.5">{abono.motivoReversion}</p>
+                                              )}
+                                            </td>
+                                            {allowActions && canRevertirPago && (
+                                              <td className="py-1.5 px-3 text-center whitespace-nowrap">
+                                                {abono.estado === 'CONFIRMADO' && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => openRevertirModal(a, abono)}
+                                                    className="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-[10px] font-bold inline-flex items-center gap-1 transition cursor-pointer"
+                                                    title="Revertir este abono específico"
+                                                  >
+                                                    <RotateCcw className="w-2.5 h-2.5" />
+                                                    <span>Revertir</span>
+                                                  </button>
+                                                )}
+                                              </td>
+                                            )}
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  )}
+                                </div>
+
+                                <div className="bg-white rounded-xl border border-purple-200 p-3 shadow-xs space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-purple-900 flex items-center gap-1.5">
+                                      <SlidersHorizontal className="w-3.5 h-3.5 text-purple-600" />
+                                      <span>Ajustes de Deuda (Sin Caja ni Mov. Bancario)</span>
+                                    </h4>
+                                    <span className="text-[11px] text-purple-700 font-semibold">
+                                      Total ajustes: <strong>{formatMoney(a.totalAjustes || 0)}</strong>
+                                    </span>
+                                  </div>
+
+                                  {(!a.ajustes || a.ajustes.length === 0) ? (
+                                    <p className="text-[11px] text-slate-400 py-1 text-center">
+                                      No hay ajustes registrados para esta actividad.
+                                    </p>
+                                  ) : (
+                                    <table className="w-full text-[11px] text-left">
+                                      <thead className="bg-purple-50 text-purple-900 font-bold uppercase border-b border-purple-200">
+                                        <tr>
+                                          <th className="py-1.5 px-3">Fecha</th>
+                                          <th className="py-1.5 px-3 text-right">Importe</th>
+                                          <th className="py-1.5 px-3">Tipo de Ajuste</th>
+                                          <th className="py-1.5 px-3">Motivo / Descripción</th>
+                                          <th className="py-1.5 px-3">Registrado Por</th>
+                                          <th className="py-1.5 px-3 text-center">Estado</th>
+                                          {allowActions && canRevertirAjuste && <th className="py-1.5 px-3 text-center">Acción</th>}
                                         </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                )}
+                                      </thead>
+                                      <tbody className="divide-y divide-purple-100">
+                                        {a.ajustes.map((ajuste) => (
+                                          <tr key={ajuste.id} className="hover:bg-purple-50/50">
+                                            <td className="py-1.5 px-3 whitespace-nowrap text-slate-600">
+                                              {new Date(ajuste.fechaAjuste).toLocaleString('es-MX')}
+                                            </td>
+                                            <td className="py-1.5 px-3 text-right font-bold text-purple-900 whitespace-nowrap">
+                                              {formatMoney(ajuste.importe)}
+                                            </td>
+                                            <td className="py-1.5 px-3">
+                                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                                ajuste.tipoAjuste === 'SALDO_PREVIO'
+                                                  ? 'bg-blue-100 text-blue-800'
+                                                  : ajuste.tipoAjuste === 'PERDONAR_DEUDA'
+                                                  ? 'bg-amber-100 text-amber-800'
+                                                  : 'bg-slate-200 text-slate-800'
+                                              }`}>
+                                                {ajuste.tipoAjuste === 'SALDO_PREVIO'
+                                                  ? 'Saldo previo'
+                                                  : ajuste.tipoAjuste === 'PERDONAR_DEUDA'
+                                                  ? 'Deuda perdonada'
+                                                  : 'Corrección'}
+                                              </span>
+                                            </td>
+                                            <td className="py-1.5 px-3 text-slate-700">
+                                              {ajuste.motivo}
+                                            </td>
+                                            <td className="py-1.5 px-3 text-slate-600">
+                                              {ajuste.registradoPor}
+                                            </td>
+                                            <td className="py-1.5 px-3 text-center">
+                                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                ajuste.estado === 'CONFIRMADO'
+                                                  ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                                                  : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                              }`}>
+                                                {ajuste.estado}
+                                              </span>
+                                              {ajuste.estado === 'REVERTIDO' && ajuste.motivoReversion && (
+                                                <p className="text-[10px] text-rose-600 mt-0.5">{ajuste.motivoReversion}</p>
+                                              )}
+                                            </td>
+                                            {allowActions && canRevertirAjuste && (
+                                              <td className="py-1.5 px-3 text-center whitespace-nowrap">
+                                                {ajuste.estado === 'CONFIRMADO' && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => openRevertirAjusteModal(a, ajuste)}
+                                                    className="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-[10px] font-bold inline-flex items-center gap-1 transition cursor-pointer"
+                                                    title="Revertir este ajuste de deuda"
+                                                  >
+                                                    <RotateCcw className="w-2.5 h-2.5" />
+                                                    <span>Revertir</span>
+                                                  </button>
+                                                )}
+                                              </td>
+                                            )}
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  )}
+                                </div>
                               </div>
                             </td>
                           </tr>
@@ -664,7 +880,19 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
               }`}
             >
               <History className="w-3.5 h-3.5" />
-              <span>Historial de Pagos</span>
+              <span>Historial de Abonos</span>
+            </button>
+          )}
+          {canVerHistorial && (
+            <button
+              type="button"
+              onClick={() => { setSelectedUserId(null); setSubTab('ajustes'); }}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                subTab === 'ajustes' ? 'bg-slate-900 text-amber-400' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>Historial de Ajustes</span>
             </button>
           )}
           {canVerMovimientos && (
@@ -921,6 +1149,91 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
                         <p>Reg: {h.registradoPor}</p>
                         {h.estado === 'REVERTIDO' && (
                           <p className="text-rose-700">Rev: {h.revertidoPor} — {h.motivoReversion}</p>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SUBTAB: HISTORIAL DE AJUSTES (SIN CAJAS) */}
+      {subTab === 'ajustes' && canVerHistorial && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
+              <SlidersHorizontal className="w-4 h-4 text-purple-600" />
+              <span>Historial Global de Ajustes de Deuda</span>
+            </h3>
+            <span className="text-xs text-slate-500">
+              {historialAjustes.length} ajuste(s) registrado(s) (sin afectación a cajas ni movimientos bancarios)
+            </span>
+          </div>
+
+          {loading ? (
+            <div className="p-8 text-center text-xs text-slate-500">Cargando historial de ajustes...</div>
+          ) : historialAjustes.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-500">No hay ajustes registrados todavía.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-purple-50 text-purple-900 font-bold uppercase tracking-wider border-b border-purple-200">
+                  <tr>
+                    <th className="py-3 px-4">Fecha</th>
+                    <th className="py-3 px-4">Usuario</th>
+                    <th className="py-3 px-4">Actividad</th>
+                    <th className="py-3 px-4 text-right">Importe Descontado</th>
+                    <th className="py-3 px-4">Tipo</th>
+                    <th className="py-3 px-4">Motivo / Descripción</th>
+                    <th className="py-3 px-4 text-center">Estado</th>
+                    <th className="py-3 px-4">Auditoría</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-purple-100">
+                  {historialAjustes.map((aj) => (
+                    <tr key={aj.id} className="hover:bg-purple-50/50">
+                      <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
+                        {new Date(aj.fechaAjuste).toLocaleString('es-MX')}
+                      </td>
+                      <td className="py-3 px-4 font-bold text-slate-900">{aj.usuarioNombre}</td>
+                      <td className="py-3 px-4 text-slate-800">{aj.actividadNombre}</td>
+                      <td className="py-3 px-4 text-right font-bold text-purple-900 whitespace-nowrap">
+                        {formatMoney(aj.importe)}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          aj.tipoAjuste === 'SALDO_PREVIO'
+                            ? 'bg-blue-100 text-blue-800'
+                            : aj.tipoAjuste === 'PERDONAR_DEUDA'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-slate-200 text-slate-800'
+                        }`}>
+                          {aj.tipoAjuste === 'SALDO_PREVIO'
+                            ? 'Saldo previo'
+                            : aj.tipoAjuste === 'PERDONAR_DEUDA'
+                            ? 'Deuda perdonada'
+                            : 'Corrección'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-700">
+                        {aj.motivo}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          aj.estado === 'CONFIRMADO'
+                            ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                            : 'bg-rose-50 text-rose-700 border border-rose-200'
+                        }`}>
+                          {aj.estado}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-[11px] text-slate-600">
+                        <p>Reg: {aj.registradoPor}</p>
+                        {aj.estado === 'REVERTIDO' && (
+                          <p className="text-rose-700">Rev: {aj.revertidoPor} — {aj.motivoReversion}</p>
                         )}
                       </td>
                     </tr>
@@ -1258,6 +1571,210 @@ export const DeudasView: React.FC<DeudasViewProps> = ({ cajas, onBalanceChanged 
                 </button>
                 <button type="submit" disabled={savingReversion} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold">
                   {savingReversion ? 'Revirtiendo...' : 'Confirmar Reversión'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL AJUSTAR DEUDA (SIN CAJAS) */}
+      {ajustandoAsig && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-lg font-bold text-purple-900 flex items-center gap-2">
+                  <SlidersHorizontal className="w-5 h-5 text-purple-600" />
+                  <span>Ajustar Deuda (Sin Cajas)</span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {ajustandoAsig.usuarioNombre} · {ajustandoAsig.actividadNombre}
+                </p>
+              </div>
+              <button type="button" onClick={() => setAjustandoAsig(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-purple-50 border border-purple-200 text-purple-900 rounded-xl text-[11px]">
+              <strong>Sin ingreso de efectivo:</strong> Este ajuste reduce el saldo pendiente de la deuda sin generar ingresos en cajas ni movimientos bancarios.
+            </div>
+
+            <div className="grid grid-cols-4 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 text-center">
+              <div>
+                <p className="text-[10px] uppercase font-bold text-slate-500">Original</p>
+                <p className="text-xs font-bold text-slate-800">{formatMoney(ajustandoAsig.importeOriginal)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-bold text-emerald-600">Abonado</p>
+                <p className="text-xs font-bold text-emerald-700">{formatMoney(ajustandoAsig.totalAbonado)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-bold text-purple-600">Ajustado</p>
+                <p className="text-xs font-bold text-purple-700">{formatMoney(ajustandoAsig.totalAjustes || 0)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-bold text-rose-600">Pendiente</p>
+                <p className="text-xs font-bold text-rose-700">{formatMoney(ajustandoAsig.saldoPendiente)}</p>
+              </div>
+            </div>
+
+            {ajusteError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs">{ajusteError}</div>
+            )}
+
+            <form onSubmit={handleConfirmAjuste} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Tipo de Ajuste *</label>
+                <div className="grid grid-cols-1 gap-1.5">
+                  {canAjusteSaldoPrevio && (
+                    <label className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition ${
+                      tipoAjuste === 'SALDO_PREVIO' ? 'bg-blue-50 border-blue-300' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="tipoAjuste"
+                        checked={tipoAjuste === 'SALDO_PREVIO'}
+                        onChange={() => setTipoAjuste('SALDO_PREVIO')}
+                        className="mt-0.5"
+                      />
+                      <div>
+                        <p className="text-xs font-bold text-slate-900">Saldo previo</p>
+                        <p className="text-[11px] text-slate-500">Abono que el usuario ya había hecho antes de usar Omega.</p>
+                      </div>
+                    </label>
+                  )}
+                  {canAjustePerdonar && (
+                    <label className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition ${
+                      tipoAjuste === 'PERDONAR_DEUDA' ? 'bg-amber-50 border-amber-300' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="tipoAjuste"
+                        checked={tipoAjuste === 'PERDONAR_DEUDA'}
+                        onChange={() => setTipoAjuste('PERDONAR_DEUDA')}
+                        className="mt-0.5"
+                      />
+                      <div>
+                        <p className="text-xs font-bold text-slate-900">Perdonar deuda</p>
+                        <p className="text-[11px] text-slate-500">Condonar o exentar parcial o totalmente el saldo pendiente.</p>
+                      </div>
+                    </label>
+                  )}
+                  {canAjusteCorregir && (
+                    <label className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition ${
+                      tipoAjuste === 'CORRECCION' ? 'bg-slate-100 border-slate-400' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="tipoAjuste"
+                        checked={tipoAjuste === 'CORRECCION'}
+                        onChange={() => setTipoAjuste('CORRECCION')}
+                        className="mt-0.5"
+                      />
+                      <div>
+                        <p className="text-xs font-bold text-slate-900">Corrección</p>
+                        <p className="text-[11px] text-slate-500">Corrección de saldos cargados erróneamente.</p>
+                      </div>
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-slate-700 uppercase">Importe *</label>
+                    <button
+                      type="button"
+                      onClick={() => setMontoAjuste(String(ajustandoAsig.saldoPendiente))}
+                      className="text-[10px] font-bold text-purple-700 hover:underline cursor-pointer"
+                    >
+                      Todo ({formatMoney(ajustandoAsig.saldoPendiente)})
+                    </button>
+                  </div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    max={ajustandoAsig.saldoPendiente}
+                    required
+                    value={montoAjuste}
+                    onChange={(e) => setMontoAjuste(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-bold text-slate-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Fecha Ajuste *</label>
+                  <input
+                    type="date"
+                    required
+                    value={fechaAjuste}
+                    onChange={(e) => setFechaAjuste(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Motivo o Descripción *</label>
+                <textarea
+                  required
+                  rows={2}
+                  value={motivoAjuste}
+                  onChange={(e) => setMotivoAjuste(e.target.value)}
+                  placeholder="Ej. Abono previo entregado en efectivo antes de Omega / Condonación autorizada"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button type="button" onClick={() => setAjustandoAsig(null)} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-xs font-bold">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={savingAjuste} className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-lg text-xs font-bold">
+                  {savingAjuste ? 'Aplicando...' : 'Aplicar Ajuste'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL REVERTIR AJUSTE */}
+      {revirtiendoAjusteItem && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <h3 className="text-lg font-bold text-rose-900 flex items-center gap-2">
+              <RotateCcw className="w-5 h-5" />
+              <span>Revertir Ajuste de Deuda</span>
+            </h3>
+            <p className="text-xs text-slate-600">
+              Se revertirá el ajuste de tipo <strong>{revirtiendoAjusteItem.ajuste.tipoAjuste}</strong> por <strong>{formatMoney(revirtiendoAjusteItem.ajuste.importe)}</strong> ({revirtiendoAjusteItem.ajuste.motivo}) de <strong>{revirtiendoAjusteItem.asig.usuarioNombre}</strong>. El registro permanecerá como REVERTIDO, se recalculará el saldo pendiente y <strong>no</strong> afectará ninguna caja ni movimiento bancario.
+            </p>
+            {reversionAjusteError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs">{reversionAjusteError}</div>
+            )}
+            <form onSubmit={handleConfirmReversionAjuste} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Motivo de reversión *</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={motivoReversionAjuste}
+                  onChange={(e) => setMotivoReversionAjuste(e.target.value)}
+                  placeholder="Ej. Ajuste capturado por error"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setRevirtiendoAjusteItem(null)} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-xs font-bold">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={savingReversionAjuste} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold">
+                  {savingReversionAjuste ? 'Revirtiendo...' : 'Confirmar Reversión'}
                 </button>
               </div>
             </form>

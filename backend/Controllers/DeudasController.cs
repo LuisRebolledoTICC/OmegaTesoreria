@@ -258,6 +258,80 @@ public class DeudasController : ControllerBase
         return Ok(list);
     }
 
+    // ─── AJUSTES DE DEUDA (SALDO PREVIO, PERDONAR DEUDA, CORRECCIÓN) ───────────
+
+    [HttpPost("asignaciones/{asignacionId}/ajustar")]
+    public async Task<IActionResult> RegistrarAjuste(int asignacionId, [FromBody] RegistrarAjusteDeudaRequest request)
+    {
+        var tipo = (request.TipoAjuste ?? "").Trim().ToUpperInvariant();
+        string requiredPermission = tipo switch
+        {
+            "SALDO_PREVIO" => Permissions.DeudasAjustesSaldoPrevio,
+            "PERDONAR_DEUDA" => Permissions.DeudasAjustesPerdonar,
+            "CORRECCION" => Permissions.DeudasAjustesCorregir,
+            _ => Permissions.DeudasAjustesCorregir
+        };
+
+        if (!await HasAnyPermissionAsync(requiredPermission))
+        {
+            return StatusCode(403, new { message = $"No tienes permiso para registrar ajustes de deuda de tipo '{tipo}'." });
+        }
+
+        try
+        {
+            var res = await _service.RegistrarAjusteAsync(asignacionId, request, CurrentUserId, CurrentUserName, IsAdmin);
+            return Ok(res);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("ajustes/{ajusteId}/revertir")]
+    public async Task<IActionResult> RevertirAjuste(int ajusteId, [FromBody] RevertirAjusteDeudaRequest request)
+    {
+        if (!await HasAnyPermissionAsync(Permissions.DeudasAjustesRevertir))
+        {
+            return StatusCode(403, new { message = "No tienes permiso para revertir ajustes de deuda." });
+        }
+
+        try
+        {
+            var res = await _service.RevertirAjusteAsync(ajusteId, request, CurrentUserId, CurrentUserName, IsAdmin);
+            return Ok(res);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("ajustes/historial")]
+    public async Task<IActionResult> GetHistorialAjustes([FromQuery] int? usuarioId, [FromQuery] int? actividadId)
+    {
+        if (!await HasAnyPermissionAsync(
+            Permissions.DeudasPagosHistorial,
+            Permissions.DeudasAjustesSaldoPrevio,
+            Permissions.DeudasAjustesPerdonar,
+            Permissions.DeudasAjustesCorregir,
+            Permissions.DeudasConsultarTodos))
+        {
+            return StatusCode(403, new { message = "No tienes permiso para consultar el historial de ajustes." });
+        }
+
+        var list = await _service.GetHistorialAjustesAsync(usuarioId, actividadId);
+        return Ok(list);
+    }
+
     [HttpGet("movimientos-bancarios")]
     public async Task<IActionResult> GetMovimientosBancarios()
     {

@@ -57,6 +57,7 @@ public record AsignacionDeudaDto(
     string UsuarioNombre,
     string Estado,
     decimal TotalAbonado,
+    decimal TotalAjustes,
     decimal SaldoPendiente,
     decimal DeudaCorrespondiente,
     string? FormaPago,
@@ -66,7 +67,8 @@ public record AsignacionDeudaDto(
     DateTime? FechaPago,
     string? RegistradoPagoPor,
     DateTime FechaAsignacion,
-    List<HistorialPagoDeudaDto>? Abonos = null
+    List<HistorialPagoDeudaDto>? Abonos = null,
+    List<AjusteDeudaDto>? Ajustes = null
 );
 
 public record UsuarioDeudaDetalleDto(
@@ -81,6 +83,17 @@ public record RegistrarPagoDeudaRequest(
     DateTime? FechaPago
 );
 
+public record RegistrarAjusteDeudaRequest(
+    decimal Importe,
+    string TipoAjuste, // SALDO_PREVIO | PERDONAR_DEUDA | CORRECCION
+    string Motivo,
+    DateTime? FechaAjuste
+);
+
+public record RevertirAjusteDeudaRequest(
+    string Motivo
+);
+
 public record CambiarEstadoAsignacionRequest(
     string NuevoEstado, // PENDIENTE | NO_ASISTIO
     string? Motivo
@@ -89,6 +102,24 @@ public record CambiarEstadoAsignacionRequest(
 public record RevertirPagoDeudaRequest(
     string Motivo,
     int? HistorialPagoId = null // Opcional: id específico del abono a revertir
+);
+
+public record AjusteDeudaDto(
+    int Id,
+    int AsignacionActividadDeudaId,
+    int ActividadDeudaId,
+    string ActividadNombre,
+    int UsuarioId,
+    string UsuarioNombre,
+    decimal Importe,
+    string TipoAjuste, // SALDO_PREVIO | PERDONAR_DEUDA | CORRECCION
+    string Motivo,
+    string Estado, // CONFIRMADO | REVERTIDO
+    DateTime FechaAjuste,
+    string RegistradoPor,
+    DateTime? FechaReversion,
+    string? RevertidoPor,
+    string? MotivoReversion
 );
 
 public record HistorialPagoDeudaDto(

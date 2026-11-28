@@ -196,6 +196,95 @@ public static class DeudasEventosTests
                 throw new Exception($"Total pagado esperado 300, obtenido {userResumen.TotalPagado}");
         });
 
+        // Test 9: Ajuste SALDO_PREVIO de $150 a actividad de $200 -> Saldo $50, Cajas intactas, 0 Operaciones nuevas
+        int asigHistoricaId = 0;
+        int ajustePerdonId = 0;
+        await AssertAsync("9. Ajuste Saldo Previo ($150 sobre $200) reduce deuda a $50 sin afectar cajas ni bancos", async () =>
+        {
+            var saldoCajaEfAntes = (await context.Cajas.FirstAsync(x => x.Id == cajaEfectivo.Id)).SaldoActual;
+            var saldoCajaTrAntes = (await context.Cajas.FirstAsync(x => x.Id == cajaTransf.Id)).SaldoActual;
+            var opsAntes = await context.Operaciones.CountAsync();
+
+            var actHist = await service.CreateActividadAsync(new CreateActividadDeudaRequest("Evento Histórico", 200m, DateTime.UtcNow.AddMonths(-2), "Carga inicial"), "admin");
+            var asigHist = await context.AsignacionesActividadDeuda.FirstAsync(a => a.ActividadDeudaId == actHist.Id && a.UsuarioId == userOmega.Id);
+            asigHistoricaId = asigHist.Id;
+
+            var res = await service.RegistrarAjusteAsync(
+                asigHistoricaId,
+                new RegistrarAjusteDeudaRequest(150m, "SALDO_PREVIO", "Abono previo antes de usar Omega", DateTime.UtcNow),
+                1, "admin", true);
+
+            if (res.Estado != "PENDIENTE") throw new Exception($"Estado esperado PENDIENTE, obtenido {res.Estado}");
+            if (res.TotalAjustes != 150m) throw new Exception($"TotalAjustes esperado 150, obtenido {res.TotalAjustes}");
+            if (res.TotalAbonado != 0m) throw new Exception($"TotalAbonado esperado 0, obtenido {res.TotalAbonado}");
+            if (res.SaldoPendiente != 50m) throw new Exception($"SaldoPendiente esperado 50, obtenido {res.SaldoPendiente}");
+
+            var saldoCajaEfDespues = (await context.Cajas.FirstAsync(x => x.Id == cajaEfectivo.Id)).SaldoActual;
+            var saldoCajaTrDespues = (await context.Cajas.FirstAsync(x => x.Id == cajaTransf.Id)).SaldoActual;
+            var opsDespues = await context.Operaciones.CountAsync();
+
+            if (saldoCajaEfDespues != saldoCajaEfAntes || saldoCajaTrDespues != saldoCajaTrAntes)
+                throw new Exception("Las cajas no debieron modificarse por un ajuste de deuda.");
+            if (opsDespues != opsAntes)
+                throw new Exception($"No debió generarse ningún movimiento bancario. Ops antes={opsAntes}, después={opsDespues}");
+        });
+
+        // Test 10: Perdonar los $50 restantes -> Estado PAGADO, Saldo $0, Cajas intactas
+        await AssertAsync("10. Perdonar deuda restante ($50) liquida la actividad a $0 sin afectar cajas", async () =>
+        {
+            var opsAntes = await context.Operaciones.CountAsync();
+            var res = await service.RegistrarAjusteAsync(
+                asigHistoricaId,
+                new RegistrarAjusteDeudaRequest(50m, "PERDONAR_DEUDA", "Condonación aprobada", DateTime.UtcNow),
+                1, "admin", true);
+
+            if (res.Estado != "PAGADO") throw new Exception($"Estado esperado PAGADO, obtenido {res.Estado}");
+            if (res.TotalAjustes != 200m) throw new Exception($"TotalAjustes esperado 200, obtenido {res.TotalAjustes}");
+            if (res.TotalAbonado != 0m) throw new Exception($"TotalAbonado esperado 0, obtenido {res.TotalAbonado}");
+            if (res.SaldoPendiente != 0m) throw new Exception($"SaldoPendiente esperado 0, obtenido {res.SaldoPendiente}");
+
+            var opsDespues = await context.Operaciones.CountAsync();
+            if (opsDespues != opsAntes) throw new Exception("No debió generarse ningún movimiento bancario al perdonar deuda.");
+
+            ajustePerdonId = res.Ajustes!.First(a => a.TipoAjuste == "PERDONAR_DEUDA").Id;
+        });
+
+        // Test 11: Revertir ajuste de perdón -> Vuelve a PENDIENTE con saldo $50, historial queda REVERTIDO
+        await AssertAsync("11. Revertir ajuste de deuda vuelve actividad a PENDIENTE con saldo $50 sin afectar cajas", async () =>
+        {
+            var opsAntes = await context.Operaciones.CountAsync();
+            var res = await service.RevertirAjusteAsync(
+                ajustePerdonId,
+                new RevertirAjusteDeudaRequest("Se revierte condonación por error"),
+                1, "admin", true);
+
+            if (res.Estado != "PENDIENTE") throw new Exception($"Estado esperado PENDIENTE, obtenido {res.Estado}");
+            if (res.TotalAjustes != 150m) throw new Exception($"TotalAjustes esperado 150, obtenido {res.TotalAjustes}");
+            if (res.SaldoPendiente != 50m) throw new Exception($"SaldoPendiente esperado 50, obtenido {res.SaldoPendiente}");
+
+            var ajRev = res.Ajustes!.First(a => a.Id == ajustePerdonId);
+            if (ajRev.Estado != "REVERTIDO") throw new Exception($"El ajuste debió quedar REVERTIDO, está {ajRev.Estado}");
+
+            var opsDespues = await context.Operaciones.CountAsync();
+            if (opsDespues != opsAntes) throw new Exception("Revertir ajuste no debe generar operaciones bancarias.");
+        });
+
+        // Test 12: Rechazar ajuste mayor al saldo pendiente ($60 sobre $50)
+        await AssertAsync("12. Rechazar ajuste superior al saldo pendiente para evitar saldos negativos", async () =>
+        {
+            bool rejected = false;
+            try
+            {
+                await service.RegistrarAjusteAsync(
+                    asigHistoricaId,
+                    new RegistrarAjusteDeudaRequest(60m, "CORRECCION", "Intento excedido", DateTime.UtcNow),
+                    1, "admin", true);
+            }
+            catch (InvalidOperationException) { rejected = true; }
+
+            if (!rejected) throw new Exception("Se permitió un ajuste superior al saldo pendiente.");
+        });
+
         Console.WriteLine("==================================================");
         Console.WriteLine($"Resultados: {passed} superadas, {failed} fallidas.");
         Console.WriteLine("==================================================");

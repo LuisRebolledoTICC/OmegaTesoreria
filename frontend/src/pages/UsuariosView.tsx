@@ -56,6 +56,10 @@ const GRUPOS_PERMISOS = [
       { id: 'deudas_pagos_revertir', nombre: 'Deudas: Revertir pagos', descripcion: 'Permite revertir pagos registrados por error conservando trazabilidad bancaria' },
       { id: 'deudas_pagos_historial', nombre: 'Deudas: Consultar historial de pagos', descripcion: 'Permite consultar el historial completo de pagos y reversiones' },
       { id: 'deudas_movimientos_bancarios', nombre: 'Deudas: Consultar movimientos bancarios', descripcion: 'Permite consultar los movimientos bancarios generados por pagos de deudas' },
+      { id: 'deudas_ajustes_saldo_previo', nombre: 'Deudas: Registrar saldos previos', descripcion: 'Permite registrar importes abonados antes de utilizar Omega sin afectar cajas ni bancos' },
+      { id: 'deudas_ajustes_perdonar', nombre: 'Deudas: Perdonar deuda', descripcion: 'Permite reducir o condonar deuda sin generar movimientos bancarios' },
+      { id: 'deudas_ajustes_corregir', nombre: 'Deudas: Corregir deuda', descripcion: 'Permite realizar correcciones de saldo deudor sin movimientos de caja' },
+      { id: 'deudas_ajustes_revertir', nombre: 'Deudas: Revertir ajustes', descripcion: 'Permite revertir ajustes de deuda registrados por error' },
     ],
   },
   {

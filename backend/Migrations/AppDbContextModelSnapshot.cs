@@ -84,6 +84,70 @@ namespace backend.Migrations
                     b.ToTable("ActividadesDeuda");
                 });
 
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.AjusteDeuda", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ActividadDeudaId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("AsignacionActividadDeudaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("FechaAjuste")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("FechaReversion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Importe")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("MotivoReversion")
+                        .HasColumnType("text");
+
+                    b.Property<string>("RegistradoPor")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RevertidoPor")
+                        .HasColumnType("text");
+
+                    b.Property<string>("TipoAjuste")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActividadDeudaId");
+
+                    b.HasIndex("AsignacionActividadDeudaId");
+
+                    b.HasIndex("Estado");
+
+                    b.HasIndex("TipoAjuste");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("AjustesDeuda");
+                });
+
             modelBuilder.Entity("OmegaTesoreria.Api.Models.Area", b =>
                 {
                     b.Property<int>("Id")
@@ -1351,6 +1415,33 @@ namespace backend.Migrations
                     b.ToTable("VentaProductos");
                 });
 
+            modelBuilder.Entity("OmegaTesoreria.Api.Models.AjusteDeuda", b =>
+                {
+                    b.HasOne("OmegaTesoreria.Api.Models.ActividadDeuda", "ActividadDeuda")
+                        .WithMany()
+                        .HasForeignKey("ActividadDeudaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OmegaTesoreria.Api.Models.AsignacionActividadDeuda", "Asignacion")
+                        .WithMany("Ajustes")
+                        .HasForeignKey("AsignacionActividadDeudaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OmegaTesoreria.Api.Models.User", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ActividadDeuda");
+
+                    b.Navigation("Asignacion");
+
+                    b.Navigation("Usuario");
+                });
+
             modelBuilder.Entity("OmegaTesoreria.Api.Models.Area", b =>
                 {
                     b.HasOne("OmegaTesoreria.Api.Models.User", "Coordinador")
@@ -1734,6 +1825,8 @@ namespace backend.Migrations
 
             modelBuilder.Entity("OmegaTesoreria.Api.Models.AsignacionActividadDeuda", b =>
                 {
+                    b.Navigation("Ajustes");
+
                     b.Navigation("HistorialPagos");
                 });
 

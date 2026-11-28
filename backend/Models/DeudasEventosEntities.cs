@@ -48,6 +48,38 @@ public class AsignacionActividadDeuda
     public Caja? Caja { get; set; }
     public Operacion? OperacionTesoreria { get; set; }
     public ICollection<HistorialPagoDeuda> HistorialPagos { get; set; } = new List<HistorialPagoDeuda>();
+    public ICollection<AjusteDeuda> Ajustes { get; set; } = new List<AjusteDeuda>();
+}
+
+/// <summary>
+/// Ajustes de deuda sin impacto en cajas ni movimientos bancarios (Saldo previo, Perdonar deuda, Corrección).
+/// </summary>
+public class AjusteDeuda
+{
+    public int Id { get; set; }
+    public int AsignacionActividadDeudaId { get; set; }
+    public int ActividadDeudaId { get; set; }
+    public int UsuarioId { get; set; }
+    public decimal Importe { get; set; }
+
+    /// <summary>SALDO_PREVIO | PERDONAR_DEUDA | CORRECCION</summary>
+    public string TipoAjuste { get; set; } = string.Empty;
+
+    public string Motivo { get; set; } = string.Empty;
+
+    /// <summary>CONFIRMADO | REVERTIDO</summary>
+    public string Estado { get; set; } = "CONFIRMADO";
+
+    public DateTime FechaAjuste { get; set; } = DateTime.UtcNow;
+    public string RegistradoPor { get; set; } = string.Empty;
+
+    public DateTime? FechaReversion { get; set; }
+    public string? RevertidoPor { get; set; }
+    public string? MotivoReversion { get; set; }
+
+    public AsignacionActividadDeuda? Asignacion { get; set; }
+    public ActividadDeuda? ActividadDeuda { get; set; }
+    public User? Usuario { get; set; }
 }
 
 /// <summary>

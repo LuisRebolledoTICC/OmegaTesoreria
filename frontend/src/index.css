@@ -41,10 +41,9 @@ body.omega-modal-open nav[aria-label="Navegación móvil"] {
   pointer-events: none !important;
 }
 
-/* Evitar zoom automático en iOS Safari al enfocar inputs/selects menores a 16px */
+/* Evitar zoom automático en iOS Safari al enfocar inputs/textareas menores a 16px */
 @media (max-width: 767px) {
   input:not([type="checkbox"]):not([type="radio"]),
-  select,
   textarea {
     font-size: 16px !important;
   }

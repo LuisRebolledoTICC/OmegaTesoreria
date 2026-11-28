@@ -36,10 +36,17 @@ import {
   EventoOmega
 } from '../types';
 
-// Detect host for LAN, Localhost and Embedded mode
+// Detect host for optional VITE_API_URL, Vite Dev (LAN/Localhost) and Embedded Production mode (Render)
+const envApiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
 const isViteDev = window.location.port === '5173';
 const host = window.location.hostname || 'localhost';
-const API_BASE_URL = isViteDev ? `http://${host}:5000/api` : '/api';
+const API_BASE_URL = envApiUrl
+  ? envApiUrl.replace(/\/+$/, '')
+  : isViteDev
+  ? `http://${host}:5000/api`
+  : '/api';
+
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
 function getHeaders(isJson = true): HeadersInit {
   const token = localStorage.getItem('omega_token');
@@ -55,25 +62,54 @@ function getHeaders(isJson = true): HeadersInit {
 
 async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    throw new Error('Sin conexión a internet. Verifica tu red e intenta nuevamente; la operación NO fue registrada.');
+    throw new Error('Sin conexión a internet. Verifica tu red e intenta nuevamente; la operación no salió del dispositivo.');
   }
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
+
   try {
-    return await apiFetch(input, init);
-  } catch {
-    throw new Error('No se pudo conectar con el servidor de Omega. Verifica tu conexión a internet; la operación NO fue registrada.');
+    return await window.fetch(input, {
+      ...init,
+      signal: init?.signal ?? controller.signal,
+    });
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error(
+        'Tiempo de espera agotado al conectar con el servidor. Verifica en pantalla si la operación se registró antes de reintentar.'
+      );
+    }
+    throw new Error(
+      'No se pudo establecer comunicación con el servidor de Omega (error de red o CORS). Si estabas registrando una operación, verifica primero antes de reintentar.'
+    );
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
-    let errorMsg = 'Error en la solicitud';
+    let serverMessage: string | undefined;
     try {
       const err = await res.json();
-      errorMsg = err.message || errorMsg;
+      if (err && typeof err.message === 'string' && err.message.trim()) {
+        serverMessage = err.message.trim();
+      }
     } catch {
-      errorMsg = `Error ${res.status}: ${res.statusText}`;
+      // Sin cuerpo JSON válido
     }
-    throw new Error(errorMsg);
+
+    if (res.status === 401) {
+      throw new Error(serverMessage || 'Credenciales incorrectas o sesión expirada.');
+    }
+    if (res.status === 403) {
+      throw new Error(serverMessage || 'No tienes permisos suficientes para realizar esta acción.');
+    }
+    if (res.status >= 500) {
+      throw new Error(serverMessage || `Error interno del servidor de Omega (HTTP ${res.status}). Intenta nuevamente más tarde.`);
+    }
+
+    throw new Error(serverMessage || `Error en la solicitud (HTTP ${res.status}).`);
   }
   return res.json();
 }

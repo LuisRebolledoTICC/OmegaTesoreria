@@ -40,7 +40,7 @@ export const LoginView: React.FC = () => {
           </p>
           <div className="mt-2 inline-flex items-center text-xs bg-slate-800/80 px-3 py-1 rounded-full border border-slate-700 text-slate-300">
             <Shield className="w-3.5 h-3.5 text-amber-400 mr-1.5" />
-            Acceso Seguro Local • Moneda: MXN
+            Acceso Seguro • Moneda: MXN
           </div>
         </div>
 

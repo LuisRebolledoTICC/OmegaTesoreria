@@ -460,7 +460,9 @@ export const PresupuestosView: React.FC<PresupuestosViewProps> = ({ cajas, onBal
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
                 Saldos acumulados e históricos asignados a cada área. Saldo total en presupuestos:{' '}
-                <strong className="text-slate-800">{formatMoney(totalGeneralDisponible)}</strong>
+                <strong className={totalGeneralDisponible < 0 ? 'text-rose-700' : 'text-slate-800'}>
+                  {formatMoney(totalGeneralDisponible)}
+                </strong>
               </p>
             </div>
 
@@ -541,11 +543,19 @@ export const PresupuestosView: React.FC<PresupuestosViewProps> = ({ cajas, onBal
 
                     {/* Body metrics */}
                     <div className="p-5 space-y-4 flex-1 flex flex-col justify-between">
-                      <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-                          Saldo Disponible
+                      <div className={`p-3.5 rounded-xl border ${
+                        r.saldoDisponible < 0
+                          ? 'bg-rose-50/70 border-rose-200'
+                          : 'bg-slate-50 border-slate-100'
+                      }`}>
+                        <span className={`text-[10px] font-bold uppercase tracking-wider block ${
+                          r.saldoDisponible < 0 ? 'text-rose-700' : 'text-slate-500'
+                        }`}>
+                          {r.saldoDisponible < 0 ? 'Saldo Negativo (Sobregirado)' : 'Saldo Disponible'}
                         </span>
-                        <p className="text-2xl font-black text-slate-900 mt-0.5">
+                        <p className={`text-2xl font-black mt-0.5 ${
+                          r.saldoDisponible < 0 ? 'text-rose-700' : 'text-slate-900'
+                        }`}>
                           {formatMoney(r.saldoDisponible)}
                         </p>
                       </div>
@@ -652,9 +662,19 @@ export const PresupuestosView: React.FC<PresupuestosViewProps> = ({ cajas, onBal
                     {formatMoney(detalle.resumen.totalGastado)}
                   </p>
                 </div>
-                <div className="bg-white p-5 rounded-xl border border-amber-300 shadow-xs bg-amber-50/30">
-                  <span className="text-xs font-bold uppercase tracking-wider text-amber-800">Saldo Disponible</span>
-                  <p className="text-2xl font-black text-slate-900 mt-1">
+                <div className={`p-5 rounded-xl border shadow-xs ${
+                  detalle.resumen.saldoDisponible < 0
+                    ? 'border-rose-300 bg-rose-50/60'
+                    : 'border-amber-300 bg-amber-50/30'
+                }`}>
+                  <span className={`text-xs font-bold uppercase tracking-wider ${
+                    detalle.resumen.saldoDisponible < 0 ? 'text-rose-700' : 'text-amber-800'
+                  }`}>
+                    {detalle.resumen.saldoDisponible < 0 ? 'Saldo Negativo' : 'Saldo Disponible'}
+                  </span>
+                  <p className={`text-2xl font-black mt-1 ${
+                    detalle.resumen.saldoDisponible < 0 ? 'text-rose-700' : 'text-slate-900'
+                  }`}>
                     {formatMoney(detalle.resumen.saldoDisponible)}
                   </p>
                   {(detalle.resumen.totalDevuelto > 0 || detalle.resumen.totalAjustes !== 0) && (
@@ -976,6 +996,12 @@ export const PresupuestosView: React.FC<PresupuestosViewProps> = ({ cajas, onBal
             </div>
 
             <form onSubmit={handleSaveEgreso} className="p-5 space-y-4">
+              {detalle && !editingEgreso && (parseFloat(egresoImporte) || 0) > detalle.resumen.saldoDisponible && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+                  El egreso supera el saldo actual ({formatMoney(detalle.resumen.saldoDisponible)}). El área quedará con saldo negativo de{' '}
+                  <strong>{formatMoney(detalle.resumen.saldoDisponible - (parseFloat(egresoImporte) || 0))}</strong>.
+                </div>
+              )}
               {egresoError && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex items-center space-x-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />

@@ -328,8 +328,6 @@ public class PresupuestosService : IPresupuestosService
         try
         {
             var presupuesto = await GetOrCreatePresupuestoAreaAsync(area.Id);
-            if (presupuesto.SaldoDisponible < request.Importe)
-                throw new InvalidOperationException($"Saldo disponible insuficiente en '{area.Nombre}'. Disponible: ${presupuesto.SaldoDisponible:N2} MXN.");
 
             var fechaUtc = request.Fecha.Kind == DateTimeKind.Unspecified
                 ? DateTime.SpecifyKind(request.Fecha, DateTimeKind.Utc)
@@ -429,12 +427,6 @@ public class PresupuestosService : IPresupuestosService
                 ?? throw new InvalidOperationException("Presupuesto del área no encontrado.");
 
             decimal diferencia = request.Importe - mov.Importe;
-            if (diferencia > 0 && presupuesto.SaldoDisponible < diferencia)
-            {
-                throw new InvalidOperationException(
-                    $"Saldo disponible insuficiente para incrementar el egreso. Disponible: ${presupuesto.SaldoDisponible:N2} MXN, diferencia requerida: ${diferencia:N2} MXN."
-                );
-            }
 
             var valoresAnteriores = JsonSerializer.Serialize(new
             {

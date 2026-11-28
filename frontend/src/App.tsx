@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Sidebar, ActiveTab } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
+import { MobileBottomNav } from './components/MobileBottomNav';
+import { usePwa } from './hooks/usePwa';
 import { LoginView } from './pages/LoginView';
 import { InicioView } from './pages/InicioView';
 import { DashboardView } from './pages/DashboardView';
@@ -19,7 +21,7 @@ import { InventariosView } from './pages/InventariosView';
 import { PresupuestosView } from './pages/PresupuestosView';
 import { Caja, DashboardSummary } from './types';
 import { api } from './services/api';
-import { Lock } from 'lucide-react';
+import { Lock, WifiOff, RefreshCw, Share, X, Download } from 'lucide-react';
 
 const ORDERED_TABS: ActiveTab[] = [
   'inicio',
@@ -58,6 +60,7 @@ const MainLayout: React.FC = () => {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [selectedCajaIdForConteo, setSelectedCajaIdForConteo] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const pwa = usePwa();
 
   const loadData = async () => {
     try {
@@ -166,9 +169,86 @@ const MainLayout: React.FC = () => {
           onRefresh={loadData}
           loading={loading}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
+          isOnline={pwa.isOnline}
+          canInstallApp={pwa.canInstall}
+          onInstallApp={pwa.promptInstall}
         />
 
-        <main className="flex-1 p-3 sm:p-5 md:p-6 overflow-y-auto w-full max-w-7xl mx-auto print:p-0 print:overflow-visible print:max-w-none">
+        {/* Banner de pérdida de conexión */}
+        {!pwa.isOnline && (
+          <div className="bg-rose-600 text-white px-4 py-2 text-xs font-semibold flex items-center justify-center gap-2 shrink-0 print:hidden">
+            <WifiOff className="w-4 h-4 shrink-0" />
+            <span>
+              Sin conexión a internet. Las consultas y registros requieren conexión con el servidor.
+            </span>
+          </div>
+        )}
+
+        {/* Banner de actualización automática de PWA */}
+        {pwa.updateAvailable && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 text-xs flex flex-wrap items-center justify-between gap-2 shrink-0 print:hidden">
+            <div className="flex items-center gap-2 text-amber-950 font-semibold">
+              <RefreshCw className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Nueva versión de Omega Tesorería disponible.</span>
+            </div>
+            <button
+              type="button"
+              onClick={pwa.applyUpdate}
+              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-amber-400 rounded-lg text-xs font-bold transition cursor-pointer"
+            >
+              Actualizar ahora
+            </button>
+          </div>
+        )}
+
+        {/* Guía discreta de instalación en iOS Safari */}
+        {pwa.isIosSafari && !pwa.installDismissed && (
+          <div className="md:hidden bg-slate-900 text-slate-100 px-3 py-2 text-[11px] flex items-center justify-between gap-2 shrink-0 print:hidden">
+            <div className="flex items-center gap-2 min-w-0">
+              <Share className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="truncate">
+                Instala Omega: toca <strong>Compartir</strong> y elige <strong>Agregar a inicio</strong>.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={pwa.dismissInstallBanner}
+              aria-label="Cerrar aviso de instalación"
+              className="p-1 text-slate-400 hover:text-white shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Banner discreto de instalación en Android cuando no está instalada */}
+        {pwa.canInstall && !pwa.installDismissed && (
+          <div className="md:hidden bg-slate-900 text-slate-100 px-3 py-2 text-[11px] flex items-center justify-between gap-2 shrink-0 print:hidden">
+            <div className="flex items-center gap-2 min-w-0">
+              <Download className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="truncate">Instala Omega Tesorería como app en tu teléfono.</span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={pwa.promptInstall}
+                className="px-2.5 py-1 bg-amber-500 text-slate-950 font-bold rounded-md text-[11px]"
+              >
+                Instalar
+              </button>
+              <button
+                type="button"
+                onClick={pwa.dismissInstallBanner}
+                aria-label="Cerrar"
+                className="p-1 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        <main className="flex-1 p-3 sm:p-5 md:p-6 pb-24 md:pb-6 overflow-y-auto w-full max-w-7xl mx-auto print:p-0 print:overflow-visible print:max-w-none">
           {currentTab === 'inicio' && canAccessTab('inicio') && (
             <InicioView
               setActiveTab={(tab) => {
@@ -249,6 +329,16 @@ const MainLayout: React.FC = () => {
 
           {currentTab === 'usuarios' && canAccessModule('usuarios') && <UsuariosView />}
         </main>
+
+        {/* Barra de navegación inferior para teléfonos (< md) */}
+        <MobileBottomNav
+          activeTab={currentTab}
+          availableTabs={availableTabs}
+          onSelectTab={(tab) => {
+            if (canAccessTab(tab)) setActiveTab(tab);
+          }}
+          onOpenMoreMenu={() => setIsMobileMenuOpen(true)}
+        />
       </div>
     </div>
   );

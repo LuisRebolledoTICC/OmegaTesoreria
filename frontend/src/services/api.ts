@@ -53,6 +53,17 @@ function getHeaders(isJson = true): HeadersInit {
   return headers;
 }
 
+async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error('Sin conexión a internet. Verifica tu red e intenta nuevamente; la operación NO fue registrada.');
+  }
+  try {
+    return await apiFetch(input, init);
+  } catch {
+    throw new Error('No se pudo conectar con el servidor de Omega. Verifica tu conexión a internet; la operación NO fue registrada.');
+  }
+}
+
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let errorMsg = 'Error en la solicitud';
@@ -70,7 +81,7 @@ async function handleResponse<T>(res: Response): Promise<T> {
 export const api = {
   // Auth
   async login(userName: string, password: string):Promise<LoginResponse> {
-    const res = await fetch(`${API_BASE_URL}/auth/login`, {
+    const res = await apiFetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userName, password }),
@@ -79,12 +90,12 @@ export const api = {
   },
 
   async getUsers(): Promise<User[]> {
-    const res = await fetch(`${API_BASE_URL}/auth/users`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/auth/users`, { headers: getHeaders() });
     return handleResponse<User[]>(res);
   },
 
   async createUser(data: { userName: string; password: string; nombre: string; rol: string; roles?: string[] }): Promise<User> {
-    const res = await fetch(`${API_BASE_URL}/auth/users`, {
+    const res = await apiFetch(`${API_BASE_URL}/auth/users`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -93,7 +104,7 @@ export const api = {
   },
 
   async updateUser(id: number, data: { nombre: string; rol: string; activo: boolean; newPassword?: string; userName?: string; roles?: string[] }): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/auth/users/${id}`, {
+    const res = await apiFetch(`${API_BASE_URL}/auth/users/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -102,7 +113,7 @@ export const api = {
   },
 
   async deleteUser(id: number): Promise<{ message: string }> {
-    const res = await fetch(`${API_BASE_URL}/auth/users/${id}`, {
+    const res = await apiFetch(`${API_BASE_URL}/auth/users/${id}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -110,12 +121,12 @@ export const api = {
   },
 
   async getPerfil(): Promise<User> {
-    const res = await fetch(`${API_BASE_URL}/auth/perfil`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/auth/perfil`, { headers: getHeaders() });
     return handleResponse<User>(res);
   },
 
   async updatePerfil(data: { nombre: string; userName: string; passwordActual?: string; nuevaPassword?: string }): Promise<LoginResponse> {
-    const res = await fetch(`${API_BASE_URL}/auth/perfil`, {
+    const res = await apiFetch(`${API_BASE_URL}/auth/perfil`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -124,7 +135,7 @@ export const api = {
   },
 
   async toggleUserStatus(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/auth/users/${id}/toggle-status`, {
+    const res = await apiFetch(`${API_BASE_URL}/auth/users/${id}/toggle-status`, {
       method: 'PATCH',
       headers: getHeaders(),
     });
@@ -133,12 +144,12 @@ export const api = {
 
   // Roles
   async getRoles(): Promise<RolPersonalizado[]> {
-    const res = await fetch(`${API_BASE_URL}/auth/roles`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/auth/roles`, { headers: getHeaders() });
     return handleResponse<RolPersonalizado[]>(res);
   },
 
   async createRol(data: { nombre: string; descripcion: string; modulosPermitidos: string[] }): Promise<RolPersonalizado> {
-    const res = await fetch(`${API_BASE_URL}/auth/roles`, {
+    const res = await apiFetch(`${API_BASE_URL}/auth/roles`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -147,7 +158,7 @@ export const api = {
   },
 
   async updateRol(id: number, data: { nombre: string; descripcion: string; modulosPermitidos: string[] }): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/auth/roles/${id}`, {
+    const res = await apiFetch(`${API_BASE_URL}/auth/roles/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -156,7 +167,7 @@ export const api = {
   },
 
   async deleteRol(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/auth/roles/${id}`, {
+    const res = await apiFetch(`${API_BASE_URL}/auth/roles/${id}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -165,25 +176,25 @@ export const api = {
 
   // Dashboard
   async getDashboardSummary(): Promise<DashboardSummary> {
-    const res = await fetch(`${API_BASE_URL}/dashboard`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/dashboard`, { headers: getHeaders() });
     return handleResponse<DashboardSummary>(res);
   },
 
   // Cajas
   async getCajas(includeInactive = false): Promise<Caja[]> {
-    const res = await fetch(`${API_BASE_URL}/cajas?includeInactive=${includeInactive}`, {
+    const res = await apiFetch(`${API_BASE_URL}/cajas?includeInactive=${includeInactive}`, {
       headers: getHeaders(),
     });
     return handleResponse<Caja[]>(res);
   },
 
   async getCajaById(id: number): Promise<Caja> {
-    const res = await fetch(`${API_BASE_URL}/cajas/${id}`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/cajas/${id}`, { headers: getHeaders() });
     return handleResponse<Caja>(res);
   },
 
   async createCaja(data: { nombre: string; descripcion: string; finalidad: string; saldoInicial: number; tipo?: string }): Promise<Caja> {
-    const res = await fetch(`${API_BASE_URL}/cajas`, {
+    const res = await apiFetch(`${API_BASE_URL}/cajas`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -192,7 +203,7 @@ export const api = {
   },
 
   async updateCaja(id: number, data: { nombre: string; descripcion?: string; finalidad?: string }): Promise<{ message: string }> {
-    const res = await fetch(`${API_BASE_URL}/cajas/${id}`, {
+    const res = await apiFetch(`${API_BASE_URL}/cajas/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -201,7 +212,7 @@ export const api = {
   },
 
   async toggleCajaStatus(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/cajas/${id}/toggle-status`, {
+    const res = await apiFetch(`${API_BASE_URL}/cajas/${id}/toggle-status`, {
       method: 'PATCH',
       headers: getHeaders(),
     });
@@ -209,7 +220,7 @@ export const api = {
   },
 
   async deleteCaja(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/cajas/${id}`, {
+    const res = await apiFetch(`${API_BASE_URL}/cajas/${id}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -218,18 +229,18 @@ export const api = {
 
   // Catalogos
   async getDenominaciones(): Promise<Denominacion[]> {
-    const res = await fetch(`${API_BASE_URL}/catalogos/denominaciones`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/catalogos/denominaciones`, { headers: getHeaders() });
     return handleResponse<Denominacion[]>(res);
   },
 
   async getTiposBolsas(cajaId?: number): Promise<TipoBolsa[]> {
     const url = cajaId ? `${API_BASE_URL}/catalogos/tipos-bolsas?cajaId=${cajaId}` : `${API_BASE_URL}/catalogos/tipos-bolsas`;
-    const res = await fetch(url, { headers: getHeaders() });
+    const res = await apiFetch(url, { headers: getHeaders() });
     return handleResponse<TipoBolsa[]>(res);
   },
 
   async createTipoBolsa(data: { nombre: string; descripcion: string; valorUnitario: number; denominacionAsociadaId?: number | null; cajaId?: number | null }): Promise<TipoBolsa> {
-    const res = await fetch(`${API_BASE_URL}/catalogos/tipos-bolsas`, {
+    const res = await apiFetch(`${API_BASE_URL}/catalogos/tipos-bolsas`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -238,7 +249,7 @@ export const api = {
   },
 
   async updateTipoBolsa(id: number, data: { nombre: string; descripcion: string; valorUnitario: number; denominacionAsociadaId?: number | null; cajaId?: number | null }): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/catalogos/tipos-bolsas/${id}`, {
+    const res = await apiFetch(`${API_BASE_URL}/catalogos/tipos-bolsas/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -247,7 +258,7 @@ export const api = {
   },
 
   async deleteTipoBolsa(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/catalogos/tipos-bolsas/${id}`, {
+    const res = await apiFetch(`${API_BASE_URL}/catalogos/tipos-bolsas/${id}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -257,7 +268,7 @@ export const api = {
   // Conteos
   async getConteos(cajaId?: number): Promise<ConteoRegistro[]> {
     const url = cajaId ? `${API_BASE_URL}/conteos?cajaId=${cajaId}` : `${API_BASE_URL}/conteos`;
-    const res = await fetch(url, { headers: getHeaders() });
+    const res = await apiFetch(url, { headers: getHeaders() });
     return handleResponse<ConteoRegistro[]>(res);
   },
 
@@ -270,7 +281,7 @@ export const api = {
     tipoMovimientoDiferencia?: string;
     conceptoDiferencia?: string;
   }): Promise<ConteoRegistro> {
-    const res = await fetch(`${API_BASE_URL}/conteos`, {
+    const res = await apiFetch(`${API_BASE_URL}/conteos`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -293,7 +304,7 @@ export const api = {
     if (params?.tipo) query.append('tipo', params.tipo);
     if (params?.usuario) query.append('usuario', params.usuario);
 
-    const res = await fetch(`${API_BASE_URL}/operaciones?${query.toString()}`, {
+    const res = await apiFetch(`${API_BASE_URL}/operaciones?${query.toString()}`, {
       headers: getHeaders(),
     });
     return handleResponse<Operacion[]>(res);
@@ -307,7 +318,7 @@ export const api = {
     observaciones?: string;
     desglose?: { tipoEfectivo: string; denominacionId?: number; tipoBolsaId?: number; cantidad: number }[];
   }): Promise<Operacion> {
-    const res = await fetch(`${API_BASE_URL}/operaciones/entrada`, {
+    const res = await apiFetch(`${API_BASE_URL}/operaciones/entrada`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -323,7 +334,7 @@ export const api = {
     observaciones?: string;
     desglose?: { tipoEfectivo: string; denominacionId?: number; tipoBolsaId?: number; cantidad: number }[];
   }): Promise<Operacion> {
-    const res = await fetch(`${API_BASE_URL}/operaciones/salida`, {
+    const res = await apiFetch(`${API_BASE_URL}/operaciones/salida`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -338,7 +349,7 @@ export const api = {
     observaciones?: string;
     desglose?: { tipoEfectivo: string; denominacionId?: number; tipoBolsaId?: number; cantidad: number }[];
   }): Promise<Operacion> {
-    const res = await fetch(`${API_BASE_URL}/operaciones/transferencia`, {
+    const res = await apiFetch(`${API_BASE_URL}/operaciones/transferencia`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -347,7 +358,7 @@ export const api = {
   },
 
   async anularOperacion(id: number, motivo: string): Promise<Operacion> {
-    const res = await fetch(`${API_BASE_URL}/operaciones/${id}/anular`, {
+    const res = await apiFetch(`${API_BASE_URL}/operaciones/${id}/anular`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ motivo }),
@@ -362,7 +373,7 @@ export const api = {
     observaciones?: string;
     fechaOperacion?: string;
   }): Promise<Operacion> {
-    const res = await fetch(`${API_BASE_URL}/operaciones/${id}`, {
+    const res = await apiFetch(`${API_BASE_URL}/operaciones/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -372,12 +383,12 @@ export const api = {
 
   // Respaldos
   async getRespaldos(): Promise<RespaldoInfo[]> {
-    const res = await fetch(`${API_BASE_URL}/respaldos`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/respaldos`, { headers: getHeaders() });
     return handleResponse<RespaldoInfo[]>(res);
   },
 
   async crearRespaldo(): Promise<RespaldoInfo> {
-    const res = await fetch(`${API_BASE_URL}/respaldos/crear`, {
+    const res = await apiFetch(`${API_BASE_URL}/respaldos/crear`, {
       method: 'POST',
       headers: getHeaders(),
     });
@@ -385,7 +396,7 @@ export const api = {
   },
 
   async restaurarRespaldo(nombreArchivo: string): Promise<{ message: string }> {
-    const res = await fetch(`${API_BASE_URL}/respaldos/restaurar`, {
+    const res = await apiFetch(`${API_BASE_URL}/respaldos/restaurar`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ nombreArchivo }),
@@ -398,7 +409,7 @@ export const api = {
   },
 
   async downloadExcelReport(): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/reportes/excel/general`, {
+    const res = await apiFetch(`${API_BASE_URL}/reportes/excel/general`, {
       method: 'GET',
       headers: getHeaders(false),
     });
@@ -436,17 +447,17 @@ export const api = {
 
   // Ventas
   async getVentas(): Promise<VentaResumen[]> {
-    const res = await fetch(`${API_BASE_URL}/ventas`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/ventas`, { headers: getHeaders() });
     return handleResponse<VentaResumen[]>(res);
   },
 
   async getVentaById(id: number): Promise<VentaDetalle> {
-    const res = await fetch(`${API_BASE_URL}/ventas/${id}`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/ventas/${id}`, { headers: getHeaders() });
     return handleResponse<VentaDetalle>(res);
   },
 
   async createVenta(data: { nombre: string; fechaVenta: string }): Promise<VentaResumen> {
-    const res = await fetch(`${API_BASE_URL}/ventas`, {
+    const res = await apiFetch(`${API_BASE_URL}/ventas`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -455,7 +466,7 @@ export const api = {
   },
 
   async updateVenta(id: number, data: { nombre: string; fechaVenta: string }): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/ventas/${id}`, {
+    const res = await apiFetch(`${API_BASE_URL}/ventas/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -464,7 +475,7 @@ export const api = {
   },
 
   async deleteVenta(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/ventas/${id}`, {
+    const res = await apiFetch(`${API_BASE_URL}/ventas/${id}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -477,7 +488,7 @@ export const api = {
     data: { nombre: string; descripcion?: string; orden: number; presentaciones: { id?: number; nombre: string; precio: number; orden: number }[] }
   ): Promise<VentaProducto> {
     const url = productoId ? `${API_BASE_URL}/ventas/${ventaId}/productos?productoId=${productoId}` : `${API_BASE_URL}/ventas/${ventaId}/productos`;
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -486,7 +497,7 @@ export const api = {
   },
 
   async deleteProducto(ventaId: number, productoId: number): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/ventas/${ventaId}/productos/${productoId}`, {
+    const res = await apiFetch(`${API_BASE_URL}/ventas/${ventaId}/productos/${productoId}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -503,7 +514,7 @@ export const api = {
       pagos: { metodoPago: string; importe: number; referencia?: string }[];
     }
   ): Promise<Pedido> {
-    const res = await fetch(`${API_BASE_URL}/ventas/${ventaId}/pedidos`, {
+    const res = await apiFetch(`${API_BASE_URL}/ventas/${ventaId}/pedidos`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -522,7 +533,7 @@ export const api = {
       pagos: { metodoPago: string; importe: number; referencia?: string }[];
     }
   ): Promise<Pedido> {
-    const res = await fetch(`${API_BASE_URL}/ventas/${ventaId}/pedidos/${pedidoId}`, {
+    const res = await apiFetch(`${API_BASE_URL}/ventas/${ventaId}/pedidos/${pedidoId}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -531,7 +542,7 @@ export const api = {
   },
 
   async updateEstadoEntrega(ventaId: number, pedidoId: number, estadoEntrega: string): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/ventas/${ventaId}/pedidos/${pedidoId}/estado-entrega`, {
+    const res = await apiFetch(`${API_BASE_URL}/ventas/${ventaId}/pedidos/${pedidoId}/estado-entrega`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify({ estadoEntrega }),
@@ -540,7 +551,7 @@ export const api = {
   },
 
   async updateMetodoPagoRapido(ventaId: number, pedidoId: number, metodoPago: 'PENDIENTE' | 'EFECTIVO' | 'TRANSFERENCIA'): Promise<Pedido> {
-    const res = await fetch(`${API_BASE_URL}/ventas/${ventaId}/pedidos/${pedidoId}/metodo-pago`, {
+    const res = await apiFetch(`${API_BASE_URL}/ventas/${ventaId}/pedidos/${pedidoId}/metodo-pago`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify({ metodoPago }),
@@ -549,7 +560,7 @@ export const api = {
   },
 
   async cancelarPedido(ventaId: number, pedidoId: number): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/ventas/${ventaId}/pedidos/${pedidoId}/cancelar`, {
+    const res = await apiFetch(`${API_BASE_URL}/ventas/${ventaId}/pedidos/${pedidoId}/cancelar`, {
       method: 'POST',
       headers: getHeaders(),
     });
@@ -557,7 +568,7 @@ export const api = {
   },
 
   async realizarEntradaVenta(ventaId: number, cajaEfectivoId: number): Promise<RealizarEntradaVentaResult> {
-    const res = await fetch(`${API_BASE_URL}/ventas/${ventaId}/realizar-entrada`, {
+    const res = await apiFetch(`${API_BASE_URL}/ventas/${ventaId}/realizar-entrada`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ cajaEfectivoId }),
@@ -567,17 +578,17 @@ export const api = {
 
   // --- ÁREAS ---
   async getAreas(): Promise<Area[]> {
-    const res = await fetch(`${API_BASE_URL}/areas`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/areas`, { headers: getHeaders() });
     return handleResponse<Area[]>(res);
   },
 
   async getAreaById(id: number): Promise<Area> {
-    const res = await fetch(`${API_BASE_URL}/areas/${id}`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/areas/${id}`, { headers: getHeaders() });
     return handleResponse<Area>(res);
   },
 
   async createArea(data: { nombre: string; descripcion?: string; coordinadorId?: number | null }): Promise<{ message: string; id: number }> {
-    const res = await fetch(`${API_BASE_URL}/areas`, {
+    const res = await apiFetch(`${API_BASE_URL}/areas`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -586,7 +597,7 @@ export const api = {
   },
 
   async updateArea(id: number, data: { nombre: string; descripcion?: string; activa: boolean; coordinadorId?: number | null }): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/areas/${id}`, {
+    const res = await apiFetch(`${API_BASE_URL}/areas/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -595,7 +606,7 @@ export const api = {
   },
 
   async toggleAreaStatus(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/areas/${id}/toggle-status`, {
+    const res = await apiFetch(`${API_BASE_URL}/areas/${id}/toggle-status`, {
       method: 'PATCH',
       headers: getHeaders(),
     });
@@ -603,7 +614,7 @@ export const api = {
   },
 
   async addIntegranteArea(areaId: number, usuarioId: number, forzarCambio = false): Promise<{ message: string }> {
-    const res = await fetch(`${API_BASE_URL}/areas/${areaId}/integrantes`, {
+    const res = await apiFetch(`${API_BASE_URL}/areas/${areaId}/integrantes`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ usuarioId, forzarCambio }),
@@ -620,7 +631,7 @@ export const api = {
   },
 
   async removeIntegranteArea(areaId: number, userId: number): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/areas/${areaId}/integrantes/${userId}`, {
+    const res = await apiFetch(`${API_BASE_URL}/areas/${areaId}/integrantes/${userId}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -628,7 +639,7 @@ export const api = {
   },
 
   async getMiArea(): Promise<MiAreaInfo> {
-    const res = await fetch(`${API_BASE_URL}/areas/mi-area`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/areas/mi-area`, { headers: getHeaders() });
     return handleResponse<MiAreaInfo>(res);
   },
 
@@ -637,12 +648,12 @@ export const api = {
     if (soloSinArea) params.append('soloSinArea', 'true');
     if (soloOmega) params.append('soloOmega', 'true');
     const qs = params.toString();
-    const res = await fetch(`${API_BASE_URL}/areas/usuarios-disponibles${qs ? `?${qs}` : ''}`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/areas/usuarios-disponibles${qs ? `?${qs}` : ''}`, { headers: getHeaders() });
     return handleResponse<UsuarioDisponible[]>(res);
   },
 
   async addIntegrantesAreaBatch(areaId: number, usuarioIds: number[]): Promise<{ message: string; count: number }> {
-    const res = await fetch(`${API_BASE_URL}/areas/${areaId}/integrantes/batch`, {
+    const res = await apiFetch(`${API_BASE_URL}/areas/${areaId}/integrantes/batch`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ usuarioIds }),
@@ -652,19 +663,19 @@ export const api = {
 
   // --- INVENTARIOS ---
   async getAreasActivasInventario(): Promise<{ id: number; nombre: string }[]> {
-    const res = await fetch(`${API_BASE_URL}/inventarios/areas-activas`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/inventarios/areas-activas`, { headers: getHeaders() });
     return handleResponse<{ id: number; nombre: string }[]>(res);
   },
 
   async getProductosInventario(areaId: number, search?: string): Promise<ProductoInventario[]> {
     const query = new URLSearchParams({ areaId: String(areaId) });
     if (search && search.trim()) query.append('search', search.trim());
-    const res = await fetch(`${API_BASE_URL}/inventarios/productos?${query.toString()}`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/inventarios/productos?${query.toString()}`, { headers: getHeaders() });
     return handleResponse<ProductoInventario[]>(res);
   },
 
   async createProductoInventario(areaId: number, data: { nombre: string; unidadMedida: string; cantidadActual: number }): Promise<ProductoInventario> {
-    const res = await fetch(`${API_BASE_URL}/inventarios/productos?areaId=${areaId}`, {
+    const res = await apiFetch(`${API_BASE_URL}/inventarios/productos?areaId=${areaId}`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -673,7 +684,7 @@ export const api = {
   },
 
   async updateProductoInventario(id: number, data: { nombre: string; unidadMedida: string; cantidadActual: number }): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/inventarios/productos/${id}`, {
+    const res = await apiFetch(`${API_BASE_URL}/inventarios/productos/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -683,7 +694,7 @@ export const api = {
 
   async deleteProductoInventario(id: number, areaId?: number): Promise<{ message: string }> {
     const qs = areaId ? `?areaId=${areaId}` : '';
-    const res = await fetch(`${API_BASE_URL}/inventarios/productos/${id}${qs}`, {
+    const res = await apiFetch(`${API_BASE_URL}/inventarios/productos/${id}${qs}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -691,22 +702,22 @@ export const api = {
   },
 
   async getUltimoInventario(areaId: number): Promise<{ existe: boolean; inventario?: InventarioDetalle; areaNombre?: string }> {
-    const res = await fetch(`${API_BASE_URL}/inventarios/ultimo?areaId=${areaId}`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/inventarios/ultimo?areaId=${areaId}`, { headers: getHeaders() });
     return handleResponse<{ existe: boolean; inventario?: InventarioDetalle; areaNombre?: string }>(res);
   },
 
   async getHistorialInventarios(areaId: number): Promise<InventarioResumen[]> {
-    const res = await fetch(`${API_BASE_URL}/inventarios/historial?areaId=${areaId}`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/inventarios/historial?areaId=${areaId}`, { headers: getHeaders() });
     return handleResponse<InventarioResumen[]>(res);
   },
 
   async getInventarioById(id: number): Promise<InventarioDetalle> {
-    const res = await fetch(`${API_BASE_URL}/inventarios/${id}`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/inventarios/${id}`, { headers: getHeaders() });
     return handleResponse<InventarioDetalle>(res);
   },
 
   async cargarInventario(areaId: number, data: { fechaInventario: string; observaciones?: string; items: ImportarExcelItem[] }): Promise<{ message: string; inventarioId: number }> {
-    const res = await fetch(`${API_BASE_URL}/inventarios/cargar?areaId=${areaId}`, {
+    const res = await apiFetch(`${API_BASE_URL}/inventarios/cargar?areaId=${areaId}`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -717,7 +728,7 @@ export const api = {
   async importarExcelInventario(areaId: number, file: File): Promise<ImportarExcelPreview> {
     const formData = new FormData();
     formData.append('archivo', file);
-    const res = await fetch(`${API_BASE_URL}/inventarios/importar-excel?areaId=${areaId}`, {
+    const res = await apiFetch(`${API_BASE_URL}/inventarios/importar-excel?areaId=${areaId}`, {
       method: 'POST',
       headers: getHeaders(false),
       body: formData,
@@ -726,7 +737,7 @@ export const api = {
   },
 
   async descargarPlantillaInventario(): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/inventarios/plantilla-excel`, {
+    const res = await apiFetch(`${API_BASE_URL}/inventarios/plantilla-excel`, {
       method: 'GET',
       headers: getHeaders(false),
     });
@@ -747,7 +758,7 @@ export const api = {
     if (params.inventarioId) query.append('inventarioId', String(params.inventarioId));
     if (params.areaId) query.append('areaId', String(params.areaId));
 
-    const res = await fetch(`${API_BASE_URL}/inventarios/exportar/excel?${query.toString()}`, {
+    const res = await apiFetch(`${API_BASE_URL}/inventarios/exportar/excel?${query.toString()}`, {
       method: 'GET',
       headers: getHeaders(false),
     });
@@ -780,17 +791,17 @@ export const api = {
 
   // --- PRESUPUESTOS ---
   async getPresupuestosResumen(): Promise<PresupuestoAreaResumen[]> {
-    const res = await fetch(`${API_BASE_URL}/presupuestos`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/presupuestos`, { headers: getHeaders() });
     return handleResponse<PresupuestoAreaResumen[]>(res);
   },
 
   async getAreasActivasPresupuesto(): Promise<{ id: number; nombre: string }[]> {
-    const res = await fetch(`${API_BASE_URL}/presupuestos/areas-activas`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/presupuestos/areas-activas`, { headers: getHeaders() });
     return handleResponse<{ id: number; nombre: string }[]>(res);
   },
 
   async getPresupuestoDetalle(areaId: number): Promise<PresupuestoAreaDetalle> {
-    const res = await fetch(`${API_BASE_URL}/presupuestos/area/${areaId}`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/presupuestos/area/${areaId}`, { headers: getHeaders() });
     return handleResponse<PresupuestoAreaDetalle>(res);
   },
 
@@ -801,7 +812,7 @@ export const api = {
     fecha: string;
     descripcion?: string;
   }): Promise<MovimientoPresupuesto> {
-    const res = await fetch(`${API_BASE_URL}/presupuestos/asignar`, {
+    const res = await apiFetch(`${API_BASE_URL}/presupuestos/asignar`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -817,7 +828,7 @@ export const api = {
     descripcion?: string;
     evidencias?: PresupuestoEvidenciaInput[];
   }): Promise<MovimientoPresupuesto> {
-    const res = await fetch(`${API_BASE_URL}/presupuestos/egresos`, {
+    const res = await apiFetch(`${API_BASE_URL}/presupuestos/egresos`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -836,7 +847,7 @@ export const api = {
       nuevasEvidencias?: PresupuestoEvidenciaInput[];
     }
   ): Promise<MovimientoPresupuesto> {
-    const res = await fetch(`${API_BASE_URL}/presupuestos/egresos/${id}`, {
+    const res = await apiFetch(`${API_BASE_URL}/presupuestos/egresos/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -845,7 +856,7 @@ export const api = {
   },
 
   async cancelarEgresoPresupuesto(id: number, motivo?: string): Promise<MovimientoPresupuesto> {
-    const res = await fetch(`${API_BASE_URL}/presupuestos/egresos/${id}/cancelar`, {
+    const res = await apiFetch(`${API_BASE_URL}/presupuestos/egresos/${id}/cancelar`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ motivo }),
@@ -860,7 +871,7 @@ export const api = {
     fecha: string;
     descripcion?: string;
   }): Promise<MovimientoPresupuesto> {
-    const res = await fetch(`${API_BASE_URL}/presupuestos/devolver`, {
+    const res = await apiFetch(`${API_BASE_URL}/presupuestos/devolver`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -874,7 +885,7 @@ export const api = {
     fecha: string;
     motivo: string;
   }): Promise<MovimientoPresupuesto> {
-    const res = await fetch(`${API_BASE_URL}/presupuestos/ajustes`, {
+    const res = await apiFetch(`${API_BASE_URL}/presupuestos/ajustes`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -884,22 +895,22 @@ export const api = {
 
   // ─── Módulo Deudas ──────────────────────────────────────────────────────────
   async getMisDeudas(): Promise<UsuarioDeudaDetalle> {
-    const res = await fetch(`${API_BASE_URL}/deudas/mis-deudas`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/deudas/mis-deudas`, { headers: getHeaders() });
     return handleResponse<UsuarioDeudaDetalle>(res);
   },
 
   async getDeudasResumenGlobal(): Promise<DeudasResumenGlobal> {
-    const res = await fetch(`${API_BASE_URL}/deudas/usuarios`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/deudas/usuarios`, { headers: getHeaders() });
     return handleResponse<DeudasResumenGlobal>(res);
   },
 
   async getDeudaDetalleUsuario(usuarioId: number): Promise<UsuarioDeudaDetalle> {
-    const res = await fetch(`${API_BASE_URL}/deudas/usuarios/${usuarioId}`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/deudas/usuarios/${usuarioId}`, { headers: getHeaders() });
     return handleResponse<UsuarioDeudaDetalle>(res);
   },
 
   async getActividadesDeuda(): Promise<ActividadDeuda[]> {
-    const res = await fetch(`${API_BASE_URL}/deudas/actividades`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/deudas/actividades`, { headers: getHeaders() });
     return handleResponse<ActividadDeuda[]>(res);
   },
 
@@ -909,7 +920,7 @@ export const api = {
     fechaActividad: string;
     descripcion?: string;
   }): Promise<ActividadDeuda> {
-    const res = await fetch(`${API_BASE_URL}/deudas/actividades`, {
+    const res = await apiFetch(`${API_BASE_URL}/deudas/actividades`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -923,7 +934,7 @@ export const api = {
     fechaActividad: string;
     descripcion?: string;
   }): Promise<ActividadDeuda> {
-    const res = await fetch(`${API_BASE_URL}/deudas/actividades/${id}`, {
+    const res = await apiFetch(`${API_BASE_URL}/deudas/actividades/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -932,7 +943,7 @@ export const api = {
   },
 
   async asignarFaltantesActividad(id: number): Promise<{ asignados: number; message: string }> {
-    const res = await fetch(`${API_BASE_URL}/deudas/actividades/${id}/asignar-faltantes`, {
+    const res = await apiFetch(`${API_BASE_URL}/deudas/actividades/${id}/asignar-faltantes`, {
       method: 'POST',
       headers: getHeaders(),
     });
@@ -945,7 +956,7 @@ export const api = {
     cajaId: number;
     fechaPago?: string;
   }): Promise<AsignacionDeuda> {
-    const res = await fetch(`${API_BASE_URL}/deudas/asignaciones/${asignacionId}/pagar`, {
+    const res = await apiFetch(`${API_BASE_URL}/deudas/asignaciones/${asignacionId}/pagar`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -957,7 +968,7 @@ export const api = {
     nuevoEstado: 'PENDIENTE' | 'NO_ASISTIO';
     motivo?: string;
   }): Promise<AsignacionDeuda> {
-    const res = await fetch(`${API_BASE_URL}/deudas/asignaciones/${asignacionId}/estado`, {
+    const res = await apiFetch(`${API_BASE_URL}/deudas/asignaciones/${asignacionId}/estado`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -966,7 +977,7 @@ export const api = {
   },
 
   async revertirPagoDeuda(asignacionId: number, motivo: string, historialPagoId?: number): Promise<AsignacionDeuda> {
-    const res = await fetch(`${API_BASE_URL}/deudas/asignaciones/${asignacionId}/revertir-pago`, {
+    const res = await apiFetch(`${API_BASE_URL}/deudas/asignaciones/${asignacionId}/revertir-pago`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ motivo, historialPagoId }),
@@ -980,7 +991,7 @@ export const api = {
     motivo: string;
     fechaAjuste?: string;
   }): Promise<AsignacionDeuda> {
-    const res = await fetch(`${API_BASE_URL}/deudas/asignaciones/${asignacionId}/ajustar`, {
+    const res = await apiFetch(`${API_BASE_URL}/deudas/asignaciones/${asignacionId}/ajustar`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -989,7 +1000,7 @@ export const api = {
   },
 
   async revertirAjusteDeuda(ajusteId: number, motivo: string): Promise<AsignacionDeuda> {
-    const res = await fetch(`${API_BASE_URL}/deudas/ajustes/${ajusteId}/revertir`, {
+    const res = await apiFetch(`${API_BASE_URL}/deudas/ajustes/${ajusteId}/revertir`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ motivo }),
@@ -1002,7 +1013,7 @@ export const api = {
     if (usuarioId) params.append('usuarioId', String(usuarioId));
     if (actividadId) params.append('actividadId', String(actividadId));
     const q = params.toString() ? `?${params.toString()}` : '';
-    const res = await fetch(`${API_BASE_URL}/deudas/ajustes/historial${q}`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/deudas/ajustes/historial${q}`, { headers: getHeaders() });
     return handleResponse<AjusteDeuda[]>(res);
   },
 
@@ -1011,23 +1022,23 @@ export const api = {
     if (usuarioId) params.append('usuarioId', String(usuarioId));
     if (actividadId) params.append('actividadId', String(actividadId));
     const q = params.toString() ? `?${params.toString()}` : '';
-    const res = await fetch(`${API_BASE_URL}/deudas/pagos/historial${q}`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/deudas/pagos/historial${q}`, { headers: getHeaders() });
     return handleResponse<HistorialPagoDeuda[]>(res);
   },
 
   async getMovimientosBancariosDeudas(): Promise<Operacion[]> {
-    const res = await fetch(`${API_BASE_URL}/deudas/movimientos-bancarios`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/deudas/movimientos-bancarios`, { headers: getHeaders() });
     return handleResponse<Operacion[]>(res);
   },
 
   // ─── Módulo Eventos ─────────────────────────────────────────────────────────
   async getEventos(): Promise<EventoOmega[]> {
-    const res = await fetch(`${API_BASE_URL}/eventos`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/eventos`, { headers: getHeaders() });
     return handleResponse<EventoOmega[]>(res);
   },
 
   async getProximosEventos(): Promise<EventoOmega[]> {
-    const res = await fetch(`${API_BASE_URL}/eventos/proximos`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE_URL}/eventos/proximos`, { headers: getHeaders() });
     return handleResponse<EventoOmega[]>(res);
   },
 
@@ -1037,7 +1048,7 @@ export const api = {
     ubicacion?: string;
     descripcion?: string;
   }): Promise<EventoOmega> {
-    const res = await fetch(`${API_BASE_URL}/eventos`, {
+    const res = await apiFetch(`${API_BASE_URL}/eventos`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -1051,7 +1062,7 @@ export const api = {
     ubicacion?: string;
     descripcion?: string;
   }): Promise<EventoOmega> {
-    const res = await fetch(`${API_BASE_URL}/eventos/${id}`, {
+    const res = await apiFetch(`${API_BASE_URL}/eventos/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(data),
@@ -1060,7 +1071,7 @@ export const api = {
   },
 
   async cancelarEvento(id: number, motivo?: string): Promise<EventoOmega> {
-    const res = await fetch(`${API_BASE_URL}/eventos/${id}/cancelar`, {
+    const res = await apiFetch(`${API_BASE_URL}/eventos/${id}/cancelar`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ motivo }),
@@ -1069,7 +1080,7 @@ export const api = {
   },
 
   async deleteEvento(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/eventos/${id}`, {
+    const res = await apiFetch(`${API_BASE_URL}/eventos/${id}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });

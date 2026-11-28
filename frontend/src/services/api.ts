@@ -191,7 +191,7 @@ export const api = {
     return handleResponse<Caja>(res);
   },
 
-  async updateCaja(id: number, data: { nombre: string; descripcion?: string }): Promise<{ message: string }> {
+  async updateCaja(id: number, data: { nombre: string; descripcion?: string; finalidad?: string }): Promise<{ message: string }> {
     const res = await fetch(`${API_BASE_URL}/cajas/${id}`, {
       method: 'PUT',
       headers: getHeaders(),

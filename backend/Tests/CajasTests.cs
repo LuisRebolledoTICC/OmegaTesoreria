@@ -55,13 +55,13 @@ public static class CajasTests
                 throw new Exception("Datos iniciales incorrectos.");
         });
 
-        await AssertAsync("2. Editar nombre y descripción mantiene intactos saldo, tipo, finalidad, estado e historial", async () =>
+        await AssertAsync("2. Editar nombre, descripción y finalidad mantiene intactos saldo, tipo, estado e historial", async () =>
         {
             var opsAntes = await context.Operaciones.CountAsync();
 
             var ok = await service.UpdateCajaAsync(
                 cajaId,
-                new UpdateCajaRequest("Caja Chica Actualizada", "Nueva descripción opcional"),
+                new UpdateCajaRequest("Caja Chica Actualizada", "Nueva descripción opcional", "Gastos operativos y compras"),
                 "admin");
 
             if (!ok) throw new Exception("UpdateCajaAsync devolvió false.");
@@ -73,10 +73,12 @@ public static class CajasTests
                 throw new Exception($"Nombre inesperado: {actualizada.Nombre}");
             if (actualizada.Descripcion != "Nueva descripción opcional")
                 throw new Exception($"Descripción inesperada: {actualizada.Descripcion}");
+            if (actualizada.Finalidad != "Gastos operativos y compras")
+                throw new Exception($"Finalidad inesperada: {actualizada.Finalidad}");
             if (actualizada.SaldoActual != 1500m)
                 throw new Exception($"El saldo cambió: {actualizada.SaldoActual}");
-            if (actualizada.Tipo != "EFECTIVO" || actualizada.Finalidad != "Gastos menores" || !actualizada.Activa)
-                throw new Exception("Se alteró tipo, finalidad o estado activa.");
+            if (actualizada.Tipo != "EFECTIVO" || !actualizada.Activa)
+                throw new Exception("Se alteró el tipo o estado activa.");
 
             var opsDespues = await context.Operaciones.CountAsync();
             if (opsDespues != opsAntes)

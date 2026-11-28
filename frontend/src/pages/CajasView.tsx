@@ -45,10 +45,11 @@ export const CajasView: React.FC<CajasViewProps> = ({ cajas, onRefresh, onNaviga
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Form states - Editar caja (solo Nombre y Descripción)
+  // Form states - Editar caja (solo Nombre, Descripción y Finalidad)
   const [editingCaja, setEditingCaja] = useState<Caja | null>(null);
   const [editNombre, setEditNombre] = useState('');
   const [editDescripcion, setEditDescripcion] = useState('');
+  const [editFinalidad, setEditFinalidad] = useState('');
   const [editError, setEditError] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -100,6 +101,7 @@ export const CajasView: React.FC<CajasViewProps> = ({ cajas, onRefresh, onNaviga
     setEditingCaja(caja);
     setEditNombre(caja.nombre);
     setEditDescripcion(caja.descripcion || '');
+    setEditFinalidad(caja.finalidad || '');
     setEditError(null);
   };
 
@@ -119,6 +121,7 @@ export const CajasView: React.FC<CajasViewProps> = ({ cajas, onRefresh, onNaviga
       await api.updateCaja(editingCaja.id, {
         nombre: nombreTrimmed,
         descripcion: editDescripcion.trim(),
+        finalidad: editFinalidad.trim(),
       });
       setSuccessMessage(`Los detalles de la caja "${nombreTrimmed}" se actualizaron correctamente.`);
       setEditingCaja(null);
@@ -412,7 +415,7 @@ export const CajasView: React.FC<CajasViewProps> = ({ cajas, onRefresh, onNaviga
                       <button
                         type="button"
                         onClick={() => handleOpenEditCaja(caja)}
-                        title="Editar nombre y descripción de la caja"
+                        title="Editar nombre, descripción y finalidad de la caja"
                         className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded transition"
                       >
                         <Pencil className="w-4 h-4" />
@@ -843,7 +846,7 @@ export const CajasView: React.FC<CajasViewProps> = ({ cajas, onRefresh, onNaviga
 
             <form onSubmit={handleSaveEditCaja} className="p-6 space-y-4 overflow-y-auto">
               <div className="p-3 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-[11px]">
-                Solo se pueden modificar el <strong>nombre</strong> y la <strong>descripción</strong>. El saldo ({formatMoney(editingCaja.saldoActual)}), tipo e historial de operaciones permanecen intactos.
+                Solo se pueden modificar el <strong>nombre</strong>, la <strong>descripción</strong> y la <strong>finalidad</strong>. El saldo ({formatMoney(editingCaja.saldoActual)}), tipo e historial de operaciones permanecen intactos.
               </div>
 
               {editError && (
@@ -861,6 +864,17 @@ export const CajasView: React.FC<CajasViewProps> = ({ cajas, onRefresh, onNaviga
                   value={editNombre}
                   onChange={(e) => setEditNombre(e.target.value)}
                   placeholder="Ej. Caja Principal"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Finalidad de la Caja</label>
+                <input
+                  type="text"
+                  value={editFinalidad}
+                  onChange={(e) => setEditFinalidad(e.target.value)}
+                  placeholder="Ej. Gastos operativos, recaudación de eventos..."
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
                 />
               </div>

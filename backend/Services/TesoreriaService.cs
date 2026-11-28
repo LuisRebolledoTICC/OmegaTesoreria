@@ -209,11 +209,13 @@ public class TesoreriaService : ITesoreriaService
         var nombreAnterior = caja.Nombre;
         var nuevoNombre = request.Nombre.Trim();
         var nuevaDescripcion = (request.Descripcion ?? string.Empty).Trim();
+        var nuevaFinalidad = (request.Finalidad ?? string.Empty).Trim();
 
-        // Únicamente se permite editar Nombre y Descripción; saldo, tipo, finalidad,
+        // Únicamente se permite editar Nombre, Descripción y Finalidad; saldo, tipo,
         // estado activo e historial de operaciones permanecen intactos.
         caja.Nombre = nuevoNombre;
         caja.Descripcion = nuevaDescripcion;
+        caja.Finalidad = nuevaFinalidad;
 
         _context.Auditoria.Add(new Auditoria
         {
